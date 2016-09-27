@@ -1,0 +1,8 @@
+syntax(2)
+
+test_suite("sandboxctl")
+
+atf_test_program{name="sandbox_test"}
+atf_test_program{name="sandboxctl_test"}
+
+include("modules/Kyuafile")

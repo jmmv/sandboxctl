@@ -1,0 +1,370 @@
+# Copyright 2013 Google Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in the
+#   documentation and/or other materials provided with the distribution.
+# * Neither the name of Google Inc. nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# \file sandbox.subr
+# Routines to interact with sandboxes.
+#
+# This module contains generic code to interact with sandboxes and utility
+# functions that sandboxes can call to prepare their contents.  The code in this
+# file is OS-independent and has no specific knowledge on how to create the
+# various types of sandboxes that depend on the underlying OS.
+#
+# "Sandbox types" implement the logic to construct sandboxes on various OSes and
+# with different configurations.  These types are shipped as invidual modules
+# that can be loaded dynamically.  Such modules can make free use of shtk and
+# the functions in this file.
+#
+# Consider a sandbox type A.  Such sandbox type must be implemented in a file
+# named A.subr and must provide the following functions:
+#
+# A_config_vars(): Prints the set of configuration variables that the sandbox
+#     type requires for its operation.  All of these variables should be
+#     prefixed with A (in uppercase) to prevent conflicts among various modules.
+# A_set_defaults(): Initializes the configuration variables to their default
+#     values.
+# A(): The main dispatcher of sandbox-specific actions.  This dispatcher takes
+#     the directory in which the sandbox lives and the action to perform on it,
+#     which can be any of the values listed in _SANDBOX_ACTIONS.
+
+shtk_import cli
+shtk_import list
+
+
+# List of valid sandbox actions.  These are the hooks that the sandbox type
+# dispatcher must implement.
+_SANDBOX_ACTIONS="create destroy mount unmount"
+
+
+# Extra options to pass to bindfs, prefixed with a comma if not empty.  Used
+# for testing purposes only.
+_SANDBOX_BINDFS_EXTRA_OPTS=
+
+
+# Sandbox types registered by the application.  Use sandbox_load_types to add
+# entries to this list.
+_SANDBOX_TYPES=
+
+
+# Loads a set of sandbox modules from a directory.
+#
+# \param typesdir Directory from which to load the modules.  All files with a
+#     .subr extension are loaded.
+sandbox_load_types() {
+    local typesdir="${1}"; shift
+
+    if [ -d "${typesdir}" ]; then
+        for typefile in "${typesdir}"/*.subr; do
+            [ "${typefile}" != "${typesdir}/*.subr" ] || break
+
+            local typename="$(basename "${typefile}" | sed -e 's,.subr$,,')"
+
+            # Keep in sync with the module-level comment describing the
+            # interface of the sandbox modules.
+            eval "${typename}_config_vars() { true; }"
+            eval "${typename}_set_defaults() { true; }"
+            eval "${typename}_create() { true; }"
+            eval "${typename}_destroy() { true; }"
+            eval "${typename}_mount() { true; }"
+            eval "${typename}_unmount() { true; }"
+
+            . "${typefile}" || shtk_cli_error "Failed to load ${typefile}"
+            _SANDBOX_TYPES="${_SANDBOX_TYPES} ${typename}"
+        done
+    fi
+}
+
+
+# Calls a function on all registered types.
+#
+# This is supposed to be used only by the container program to initialize the
+# various modules.  For this reason, if any of the hooks reports an error,
+# execution is immediately terminated.
+#
+# \param hook Name of the function to invoke.  The actual function called is
+#     <type_name>_<hook>.
+sandbox_call_types() {
+    local hook="${1}"; shift
+
+    for sandbox_type in ${_SANDBOX_TYPES}; do
+        "${sandbox_type}_${hook}" "${@}" \
+            || shtk_cli_error "Call to ${hook} on ${sandbox_type} failed"
+    done
+}
+
+
+# Dispatches a sandbox action to a type-specific handler.
+#
+# \param type Type of the sandbox being handled.
+# \param root Path to the sandbox directory.
+# \param action Name of the action to dispatch to the handler.
+sandbox_dispatch() {
+    local type="${1}"; shift
+    local root="${1}"; shift
+    local action="${1}"; shift
+
+    shtk_list_contains "${action}" ${_SANDBOX_ACTIONS} \
+        || shtk_cli_error "Cannot dispatch unknown action ${action}"
+
+    local function_name="$(echo "${type}" | tr - _)"
+    if shtk_list_contains "${function_name}" ${_SANDBOX_TYPES}; then
+        ( "${function_name}_${action}" "${root}" ) \
+            || shtk_cli_error "Failed to ${action} sandbox type ${type}"
+    else
+        shtk_cli_error "Invalid sandbox type '${type}'"
+    fi
+}
+
+
+# Records that the sandbox is in use by one more user.
+#
+# \param root Path to the sandbox to lock.
+#
+# \return True if we are the first user to enter the sandbox or false if
+# somebody else was already using it, in which case we just accounted ourselves
+# as a new user.
+sandbox_enter() {
+    local root="${1}"; shift
+
+    local lock="${root}/.sandbox_lock"
+    if [ -f "${lock}" ]; then
+        echo "1" >>"${lock}" || shtk_cli_error "Failed to lock sandbox"
+        return 1
+    else
+        echo "1" >"${lock}" || shtk_cli_error "Failed to lock sandbox"
+        return 0
+    fi
+}
+
+
+# Records that the sandbox is in use by one fewer user.
+#
+# \param root Path to the sandbox to unlock.
+#
+# \return True if we were the last user to leave the sandbox, false otherwise.
+sandbox_leave() {
+    local root="${1}"; shift
+
+    local lock="${root}/.sandbox_lock"
+    [ -f "${lock}" ] || shtk_cli_error "Sandbox not locked"
+    sed -e 1d "${lock}" >"${lock}.tmp" \
+        || shtk_cli_error "Failed to unlock sandbox"
+    if [ -s "${lock}.tmp" ]; then
+        mv "${lock}.tmp" "${lock}" \
+            || shtk_cli_error "Failed to unlock sandbox"
+        return 1
+    else
+        rm -f "${lock}.tmp" "${lock}"
+        return 0
+    fi
+}
+
+
+# Checks if the sandbox still has any mount points.
+#
+# \param root Path to the sandbox root.
+#
+# \return True if the given directory is a mount point or has any file systems
+# mounted within it; false otherwise.
+sandbox_has_mounts() {
+    local root="${1}"; shift
+
+    [ -d "${root}" ] || return 1
+
+    local real_root="$(cd "${root}" && pwd -P)"
+    LANG=C LC_ALL=C mount | grep -E " on ${real_root}(/[^ ]+| )" >/dev/null 2>&1
+}
+
+
+# Unmounts all file systems.
+#
+# \param root Path to the sandbox root.
+sandbox_unmount_dirs() {
+    local root="${1}"; shift
+
+    local real_root="$(cd "${root}" && pwd -P)"
+    LANG=C LC_ALL=C mount \
+        | grep -Eo " on ${real_root}/[^ ]+" \
+        | cut -d ' ' -f 3- \
+        | while read dir
+    do
+        shtk_cli_debug "Unmounting ${dir}"
+        umount "${dir}" || shtk_cli_error "Failed to unmount sandbox"
+    done
+}
+
+
+# Destroys a sandbox.
+#
+# This ensures that the sandbox is not still mounted and deletes its contents.
+# There are several provisions here to ensure we do not delete more than we
+# should.
+#
+# \param root Path to the sandbox.
+sandbox_destroy() {
+    local root="${1}"; shift
+
+    local real_root="$(cd "${root}" && pwd -P)"
+    [ "${real_root}" != / ] || \
+        shtk_abort "Attempting to delete /; something really bad happened"
+
+    ! sandbox_has_mounts "${real_root}" || shtk_abort "Attempting to delete" \
+        "an still-mounted sandbox; this should not have happened"
+
+    # Allow the hierarchy to be removed if not running as root for test
+    # purposes.  This is a best-effort operation, hence why it's silent: if we
+    # fail here and we do not fail in the rm call below... great!
+    chmod -R u+rwx "${real_root}" 2>/dev/null || true
+
+    case "$(uname -m)" in
+        FreeBSD|NetBSD)
+            # Be extra paranoid: use NetBSD's -x flag to avoid crossing
+            # mount points.  We don't want the remove operation to
+            # "leak" outside of the sandbox, especially during the
+            # development of sandboxctl.
+            rm -xrf "${real_root}" || shtk_cli_error "Failed to destroy ${root}"
+            ;;
+
+        *)
+            rm -rf "${real_root}" || shtk_cli_error "Failed to destroy ${root}"
+            ;;
+    esac
+}
+
+
+# Extracts a gzipped tarball into a directory.
+#
+# This is a public function usable within the hooks in the configuration file.
+#
+# \param tgz_file Path to the tarball to extract.
+# \param dir Path to the directory into which to extract the tarball.
+# \param ... Optional list of files to extract.
+sandbox_extract() {
+    [ ${#} -ge 2 ] || shtk_cli_error "sandbox_extract: syntax error;" \
+        "expecting tarball and target"
+    local tgz_file="${1}"; shift
+    local dir="${1}"; shift
+
+    if [ ${#} -gt 0 ]; then
+        shtk_cli_debug "Extracting ${tgz_file} into ${dir} (contents: ${*})"
+    else
+        shtk_cli_debug "Extracting ${tgz_file} into ${dir}"
+    fi
+
+    local tar_extra_flags=
+    case "$(uname -m)" in
+        NetBSD)
+            tar_extra_flags=e  # Stop on first error.
+            ;;
+    esac
+
+    if shtk_cli_log_level debug && which progress >/dev/null 2>&1; then
+        progress -zf "${tgz_file}" tar "-${tar_extra_flags}xp" -C "${dir}" \
+            -f - "${@}"  || shtk_cli_error "Extraction of ${tgz_file} failed"
+    else
+        tar "-${tar_extra_flags}xzp" -f "${tgz_file}" -C "${dir}" "${@}" \
+            || shtk_cli_error "Extraction of ${tgz_file} failed"
+    fi
+}
+
+
+# Mounts a bindfs-type file system.
+#
+# This is a public function usable within the hooks in the configuration file.
+#
+# \param -o ro|rw Whether to mount the file system in read-only or read-write
+#     mode.  The default is "ro".
+# \param source Directory to bind.
+# \param mount_point Path where to mount the source directory.
+sandbox_bindfs() {
+    local mode=ro
+    local OPTIND
+    while getopts ':o:' arg "${@}"; do
+        case "${arg}" in
+            o)  # Mount options.
+                case "${OPTARG}" in
+                    ro|rw)
+                        mode="${OPTARG}"
+                        ;;
+
+                    *)
+                        shtk_cli_usage_error "Unsupported mount option" \
+                                             "${OPTARG}"
+                        ;;
+                esac
+                ;;
+
+            \?)
+                shtk_cli_usage_error "Unknown option -${OPTARG}"
+                ;;
+        esac
+    done
+    shift $((${OPTIND} - 1))
+    OPTIND=1  # Should not be necessary due to the 'local' above.
+
+    [ ${#} -eq 2 ] || shtk_cli_error "sandbox_bindfs: syntax error;" \
+        "expecting source and mount point"
+    local source="${1}"; shift
+    local mount_point="${1}"; shift
+
+    shtk_cli_debug "Bind-mounting ${source} onto ${mount_point} (${mode})"
+    case "$(uname -s)" in
+        Darwin)
+            local bindfs='__BINDFS__'
+            [ -n "${bindfs}" ] || shtk_abort "bindfs should have been" \
+                "detected at configuration time"
+
+            "${bindfs}" -o "${mode}${_SANDBOX_BINDFS_EXTRA_OPTS}" \
+                "${source}" "${mount_point}" \
+                || shtk_cli_error "Failed to bind ${mount_point}"
+
+            local retries=50
+            while [ ${retries} -gt 0 ] && ! sandbox_has_mounts "${mount_point}"
+            do
+                shtk_cli_debug "bindfs mount point ${mount_point} has not" \
+                    "appeared yet; waiting"
+                sleep .1
+                retries=$((${retries} - 1))
+            done
+            [ ${retries} -gt 0 ] || shtk_cli_error "bindfs failed to come up"
+            ;;
+
+        FreeBSD)
+            mount -t nullfs -o "${mode}" "${source}" "${mount_point}" \
+                || shtk_cli_error "Failed to bind ${mount_point}"
+            ;;
+
+        NetBSD)
+            mount -t null -o "${mode}" "${source}" "${mount_point}" \
+                || shtk_cli_error "Failed to bind ${mount_point}"
+            ;;
+
+        *)
+            shtk_abort "Unsupported OS for sandbox_bindfs"
+            ;;
+    esac
+}

@@ -1,0 +1,224 @@
+.\" Copyright 2013 Google Inc.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are
+.\" met:
+.\"
+.\" * Redistributions of source code must retain the above copyright
+.\"   notice, this list of conditions and the following disclaimer.
+.\" * Redistributions in binary form must reproduce the above copyright
+.\"   notice, this list of conditions and the following disclaimer in the
+.\"   documentation and/or other materials provided with the distribution.
+.\" * Neither the name of Google Inc. nor the names of its contributors
+.\"   may be used to endorse or promote products derived from this software
+.\"   without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+.\" "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+.\" A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+.\" OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+.\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+.\" LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd September 27, 2016
+.Dt SANDBOXCTL 8
+.Os
+.Sh NAME
+.Nm sandboxctl
+.Nd creates and manages chroot-based sandboxed environments
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar config_name
+.Op Fl o Ar variable=value
+.Op Fl v
+config
+.Nm
+.Op Fl c Ar config_name
+.Op Fl o Ar variable=value
+.Op Fl v
+create
+.Nm
+.Op Fl c Ar config_name
+.Op Fl o Ar variable=value
+.Op Fl v
+destroy
+.Nm
+.Op Fl c Ar config_name
+.Op Fl o Ar variable=value
+.Op Fl v
+run
+.Ar ...
+.Nm
+.Op Fl c Ar config_name
+.Op Fl o Ar variable=value
+.Op Fl v
+shell
+.Sh DESCRIPTION
+.Nm
+creates and manages chroot-based sandboxed environments in a portable manner
+based on a simple configuration file.
+.Pp
+Because
+.Xr chroot 8
+is a privileged system command, you must be root to use this tool.
+.Pp
+The following options apply to all commands:
+.Bl -tag -width XXXX
+.It Fl c Ar config_name
+Specifies the configuration file to use.
+The format of the file is described in
+.Xr sandboxctl.conf 5 .
+.Pp
+If
+.Ar config_name
+includes any directory separator (i.e. one or more slashes) or the
+.Sq .conf
+suffix, then the argument specifies the path to the configuration file.
+.Pp
+If
+.Ar config_name
+is a bare name without any directory components nor the extension, then the
+configuration file will be looked up in
+.Pa __SANDBOXCTL_ETCDIR__/<config_name>.conf .
+The file must exist in this case.
+.It Fl o Ar variable=value
+Applies an override to the loaded configuration.
+.Pp
+The
+.Ar variable
+part of the argument must be any of the recognized configuration variables
+described in
+.Xr sandboxctl.conf 5 .
+The
+.Ar value ,
+if not empty, specifies the value to set the configuration variable to.
+If
+.Ar value
+is empty, then the configuration variable is unset.
+.It Fl v
+Enables verbose mode.
+.El
+.Ss Sandbox types
+Sandboxes managed by
+.Nm
+have a type associated to them.
+The sandbox type etermines how the sandbox is constructed and provides all the
+operating system-specific knowledge to do so.
+There is one or more sandbox types for every supported operating system.
+.Pp
+For example: on
+.Nx ,
+there is sandbox type to create an environment that reproduces the host system,
+and there also is a sandbox type that recreates a fresh installation of the
+system.
+Sandbox types are described in
+.Xr sandboxctl.conf 5
+along with all the settings that affect their behavior.
+.Ss Sandbox lifecycle
+A sandbox managed by
+.Nm
+goes through these operations:
+.Bl -enum
+.It
+.Em Configure :
+The administrator sets up a configuration file to define the sandbox.
+See
+.Xr sandboxctl.conf 5
+for details.
+.It
+.Em Create :
+Prepares the on-disk layout but does not mount any file systems within it (which
+may be necessary depending on the type of the sandbox).
+This operation happens once per sandbox.
+The sandbox is created with the
+.Sq create
+command.
+.It
+.Em Enter or mount :
+Performs preparatory work to enter the sandbox, such as mounting any filesystems
+within the sandbox or copying dynamic files.
+This operation happens every time the sandbox is entered for interaction as
+described in the next command.
+.It
+.Em Interact :
+The administator can issue commands within the sandbox via the
+.Sq run
+command or open a shell via the
+.Sq shell
+command.
+.It
+.Em Leave or unmount :
+Performs the opposite work of the
+.Em Enter
+step.
+In particular, unmounts any file systems that may be left mounted in the
+sandbox.
+This operation happens every time the interaction step completes.
+.It
+.Em Destroy :
+The on-disk layout for the sandbox is completely removed.
+This operation cannot be executed while there is any active sandbox in the
+.Em Interact
+stage.
+The sandbox is destroyed with the
+.Sq destroy
+command.
+.El
+.Pp
+Note that sandbox entry/leave operations are reference-counted and can happen
+concurrently.
+.Nm
+ensures that only the first concurrent interaction step executes the entry step
+and that only the last concurrent interaction step executes the leave step.
+.Ss The config command
+The config command dumps the loaded configuration to the standard output.
+The format of the output is not a script, so it cannot be fed back into
+.Nm .
+The purpose of this command is to aid in debugging the configuration of the
+tool, particularly for those configuration files that use shell logic to
+determine the value of the variables they define.
+.Pp
+Note that the output of this command varies across operating systems depending
+on the sandbox types available.
+.Ss The create command
+Creates the sandbox, which must not yet exist.
+.Ss The destroy command
+Destroys the sandbox, which must exist and must not be active.
+In other words, no other
+.Nm
+instance may be running the
+.Sq run
+or
+.Sq shell
+commmands.
+.Ss The run command
+Executes a given command inside the sandbox.
+The sandbox must exist.
+This operation always mounts the sandbox before running the command and unmounts
+it after completion.
+.Ss The shell command
+Executes an interactive shell inside the sandbox.
+The sandbox must exist.
+This operation always mounts the sandbox before running the shell and unmounts
+it after completion.
+.Sh FILES
+.Bl -tag -width XXXX
+.It Pa __SANDBOXCTL_ETCDIR__/
+Directory containing all system-wide configuration files.
+.It Pa __SANDBOXCTL_ETCDIR__/default.conf
+Default configuration file to load if the user does not specify any other.
+.El
+.Sh SEE ALSO
+.Xr sandboxctl.conf 5 ,
+.Xr chroot 8
+.Sh AUTHORS
+The
+.Nm
+utility was developed by
+.An Julio Merino
+.Aq jmmv@google.com .

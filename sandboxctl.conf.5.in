@@ -1,0 +1,240 @@
+.\" Copyright 2013 Google Inc.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are
+.\" met:
+.\"
+.\" * Redistributions of source code must retain the above copyright
+.\"   notice, this list of conditions and the following disclaimer.
+.\" * Redistributions in binary form must reproduce the above copyright
+.\"   notice, this list of conditions and the following disclaimer in the
+.\"   documentation and/or other materials provided with the distribution.
+.\" * Neither the name of Google Inc. nor the names of its contributors
+.\"   may be used to endorse or promote products derived from this software
+.\"   without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+.\" "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+.\" A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+.\" OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+.\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+.\" LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd September 27, 2016
+.Dt SANDBOXCTL.CONF 5
+.Os
+.Sh NAME
+.Nm sandboxctl.conf
+.Nd configuration file format for the sandboxctl tool
+.Sh DESCRIPTION
+Configuration files for
+.Xr sandboxctl 8
+are plain shell scripts that define a set of recognized variables and can
+optionally provide a set of hooks for the actions offered by the tool.
+.Ss Configuration variables
+The following generic variables configure the sandbox:
+.Bl -tag -width XXXX
+.It Va SANDBOX_TYPE
+The name of the configuration type to use for the sandbox.
+There is at least one type for every supported operating system but there may
+be more than one.
+.Pp
+You can find a subsection below for each of the supported types, in which you
+will find all necessary details on how to use that particular type.
+.Pp
+Default:
+.Sq empty .
+.It Va SANDBOX_ROOT
+Path to the sandbox to be handled by this configuration file.
+This variable must be set in the configuration file.
+.Pp
+The directory pointed at by this variable cannot exist upon sandbox creation
+and will be deleted when the sandbox is destroyed.
+.Pp
+Default: not set.
+.El
+.Ss Configuration variables for the empty sandbox type
+The
+.Sq empty
+sandbox type sets up a completely empty sandbox.
+.Pp
+Empty sandboxes are not useful in practice, but this type comes in handy to
+define custom sandbox types.
+To define a custom sandbox, you can use this type and then define pre/post
+hooks for the various stages of the sandbox construction.
+@if Darwin
+.Ss Configuration variables for the darwin-native sandbox type
+The
+.Sq darwin-native
+sandbox type sets up a macOS sandbox on a macOS host and replicates the host
+system under the sandbox using bindfs mounts.
+Sandboxes created using this type mimic the host system and are fast to create
+and destroy.
+@endif
+@if FreeBSD
+.Ss Configuration variables for the freebsd-native sandbox type
+The
+.Sq freebsd-native
+sandbox type sets up a
+.Fx
+sandbox on a
+.Fx
+host and replicates the host system under the sandbox using null mounts.
+Sandboxes created using this type mimic the host system and are fast to create
+and destroy.
+@endif
+@if NetBSD
+.Ss Configuration variables for the netbsd-native sandbox type
+The
+.Sq netbsd-native
+sandbox type sets up a
+.Nx
+sandbox on a
+.Nx
+host and replicates the host system under the sandbox using null mounts.
+Sandboxes created using this type mimic the host system and are fast to create
+and destroy.
+.Pp
+The following variables configure this type:
+.Bl -tag -width XXXX
+.It Va NETBSD_NATIVE_RELEASEDIR
+Path to the directory containing the release that matches the host system.
+The distribution sets are expected to live within a
+.Pa binary/sets/
+subdirectory of the given path.
+.Pp
+Even though this sandbox type uses the native host system as a reference for the
+setup of the sandbox, these sets are needed to unpack fresh configuration and
+support files that cannot be inherited from the host.
+.Pp
+Default:
+.Pa /home/sysbuild/release/$(uname -m)
+.El
+.Ss Configuration variables for the netbsd-release sandbox type
+The
+.Sq netbsd-release
+sandbox type sets up a
+.Nx
+sandbox on a
+.Nx
+host using release sets.
+Sandboxes created in this manner are "clean" in the sense that they reproduce a
+freshly installed system and are completely decoupled from the host system.
+If the kernel contains the correct backwards-compatibility options (the
+default), you can even use release sets for different
+.Nx
+versions to create a sandbox for older operating system versions.
+.Pp
+The following variables configure this type:
+.Bl -tag -width XXXX
+.It Va NETBSD_RELEASE_RELEASEDIR
+Path to the directory containing the release to be unpacked inside the sandbox.
+The distribution sets are expected to live within a
+.Pa binary/sets/
+subdirectory of the given path.
+.Pp
+Default:
+.Pa /home/sysbuild/release/$(uname -m)
+.It Va NETBSD_RELEASE_SETS
+Basename of the sets to unpack inside the sandbox, without their
+.Sq .tgz
+extension.
+.Pp
+If this variable is unset,
+.Xr sandboxctl 8
+will automatically determine the sets to extract based on the contents of the
+.Va NETBSD_RELEASE_RELEASEDIR
+directory.
+In particular, all available
+.Sq .tgz
+userland sets will be extracted.
+As for the kernel,
+.Sq kern-GENERIC
+will be preferred over any other kernel set but, if not present, the first
+kernel set in lexicographical order will be used.
+.Pp
+A reasonable setting to set up a barebones sandbox would be to list
+.Sq base etc kern-GENERIC
+in this variable.
+.Pp
+Default: not set.
+.El
+@endif
+.Ss Hooks
+Hooks are user-provided routines invoked at particular points of the sandbox
+manipulation.
+These are defined as shell functions and have direct access to the configuration
+variables in the file.
+Hooks must return a success error code and they cannot contain unprotected
+shell commands.
+.Pp
+The following hooks can be defined:
+.Bl -tag -width XXXX
+.It Fn post_create_hook
+Function executed after creating the sandbox.
+.It Fn pre_destroy_hook
+Function executed before starting to destroy the sandbox.
+.It Fn post_mount_hook
+Function executed after finishing to mount filesystems within the sandbox.
+.It Fn pre_unmount_hook
+Function executed before starting to unmount filesystems within the sandbox.
+.El
+.Ss Helper functions
+Hooks have access to the following helper functions:
+.Bl -tag -width XXXX
+.It Nm sandbox_bindfs Oo Fl o Ar ro|rw Oc Ar source Ar mount_point
+Remounts the host directory
+.Ar source
+within the sandbox in then
+.Ar mount_point
+directory using a bindfs-like file system.
+The specific file system used to perform this operation depends on the
+underlying operating system.
+The
+.Ar ro
+and
+.Ar rw
+arguments to the
+.Fl o
+option specify whether to mount the directory in read-only mode (the default) or
+in read-write mode.
+.Pp
+Note that
+.Ar mount_point
+is an absolute path, so you must prefix it with
+.Sq ${SANDBOX_ROOT}
+to point to the correct location within the sandbox.
+.Pp
+This function is typically used in
+.Fn post_mount_hook .
+There is no need to manually unmount the file systems in the
+.Fn pre_unmount_hook ;
+the unmount happens automatically.
+.It Nm sandbox_extract Ar tgz_file Ar dir Op Ar file1 .. fileN
+Extracts the given gzipped tarball in
+.Ar tgz_file
+into the
+.Ar dir
+directory.
+If specified,
+.Ar file1 .. fileN
+indicate the subset of files to extract from the tarball.
+.Pp
+Note that
+.Ar dir
+is an absolute path, so you must prefix it with
+.Sq ${SANDBOX_ROOT}
+to point to the correct location within the sandbox.
+.Pp
+This function is typicall used in
+.Fn post_create_hook .
+There is no need to manually remove the extracted files; the removal happens
+automatically.
+.El
+.Sh SEE ALSO
+.Xr sandboxctl 8

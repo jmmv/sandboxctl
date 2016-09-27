@@ -1,0 +1,94 @@
+# Copyright 2013 Google Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in the
+#   documentation and/or other materials provided with the distribution.
+# * Neither the name of Google Inc. nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# \file netbsd_native.subr
+# Sandbox type to null-mount a live NetBSD system.
+
+shtk_import cli
+shtk_import config
+shtk_import sandbox
+
+# List of directories to null-mount in read-only mode.
+_NETBSD_NATIVE_BINDFS_MOUNTS="
+    bin lib libdata libexec sbin
+    usr/bin usr/include usr/lib usr/libdata usr/libexec usr/sbin usr/share"
+
+
+# Prints the configuration variables exposed by this sandbox type.
+netbsd_native_config_vars() {
+    echo "NETBSD_NATIVE_RELEASEDIR"
+}
+
+
+# Sets defaults for the configuration variables used by this sandbox type.
+netbsd_native_set_defaults() {
+    # Remember to update sandboxctl.conf(5) if you change any default values.
+    shtk_config_set NETBSD_NATIVE_RELEASEDIR \
+        "/home/sysbuild/release/$(uname -m)"
+}
+
+
+# Sets up a NetBSD sandbox that uses null mounts.
+#
+# \param root Path to the sandbox directory.
+netbsd_native_create() {
+    local root="${1}"; shift
+
+    local releasedir="$(shtk_config_get NETBSD_NATIVE_RELEASEDIR)"
+    [ -d "${releasedir}" ] || shtk_cli_error "Release directory ${releasedir}" \
+        "does not exist"
+
+    for dir in ${_NETBSD_NATIVE_BINDFS_MOUNTS}; do
+        mkdir -p "${root}/${dir}" || return
+    done
+    mkdir "${root}/home"
+
+    cp /netbsd "${root}/netbsd" || return
+
+    sandbox_extract "${releasedir}/binary/sets/base.tgz" "${root}" \
+                    ./etc ./root ./tmp ./var
+    sandbox_extract "${releasedir}/binary/sets/etc.tgz" "${root}"
+
+    shtk_cli_debug "Creating device nodes"
+    ( cd "${root}/dev" && ./MAKEDEV all ) \
+        || shtk_cli_error "MAKEDEV failed"
+}
+
+
+# Enters a NetBSD sandbox that uses null mounts.
+#
+# \param root Path to the sandbox directory.
+netbsd_native_mount() {
+    local root="${1}"; shift
+
+    cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
+
+    for dir in ${_NETBSD_NATIVE_BINDFS_MOUNTS}; do
+        sandbox_bindfs "/${dir}" "${root}/${dir}"
+    done
+}

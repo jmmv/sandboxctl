@@ -1,0 +1,121 @@
+# Copyright 2013 Google Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in the
+#   documentation and/or other materials provided with the distribution.
+# * Neither the name of Google Inc. nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# \file netbsd_release.subr
+# Sandbox type to extract release sets.
+
+shtk_import cli
+shtk_import config
+shtk_import sandbox
+
+
+# Prints the configuration variables exposed by this sandbox type.
+netbsd_release_config_vars() {
+    echo "NETBSD_RELEASE_RELEASEDIR"
+    echo "NETBSD_RELEASE_SETS"
+}
+
+
+# Sets defaults for the configuration variables used by this sandbox type.
+netbsd_release_set_defaults() {
+    # Remember to update sandboxctl.conf(5) if you change any default values.
+    shtk_config_set NETBSD_RELEASE_RELEASEDIR \
+        "/home/sysbuild/release/$(uname -m)"
+}
+
+
+# Computes the collection of sets to extract for the release.
+#
+# If the user has specified NETBSD_SETS in the configuration file, we respect
+# their choice.
+#
+# Otherwise, we automatically expand all the sets in the release directory.
+# Because a release directory can include more than one kern-* set, we prefer a
+# kern-GENERIC.tgz if it exists; else, we pick the first name in lexicographical
+# order.
+#
+# \param releasedir Path to the root directory of the release files
+#
+# \post Prints the name of the detected sets, including their .tgz extensions.
+_netbsd_release_get_sets() {
+    local releasedir="${1}"; shift
+
+    if shtk_config_has NETBSD_RELEASE_SETS; then
+        shtk_config_get NETBSD_RELEASE_SETS
+    else
+        local kernel_set=
+        for name in $(cd "${releasedir}/binary/sets" \
+                      && echo *.tgz | fmt 1 | sort)
+        do
+            case "${name}" in
+                kern-GENERIC.*)
+                    kernel_set="${name}"
+                    ;;
+                kern-*)
+                    [ -n "${kernel_set}" ] || kernel_set="${name}"
+                    ;;
+                *)
+                    echo "${name}"
+                    ;;
+            esac
+        done
+        [ -z "${kernel_set}" ] || echo "${kernel_set}"
+    fi
+}
+
+
+# Sets up a NetBSD sandbox that uses release sets.
+#
+# \param root Path to the sandbox directory.
+netbsd_release_create() {
+    local root="${1}"; shift
+
+    local releasedir="$(shtk_config_get NETBSD_RELEASE_RELEASEDIR)"
+    [ -d "${releasedir}" ] || shtk_cli_error \
+        "Release directory ${releasedir} does not exist"
+
+    local sets="$(_netbsd_release_get_sets "${releasedir}")"
+
+    for tgz_set in ${sets}; do
+        sandbox_extract "${releasedir}/binary/sets/${tgz_set}" \
+            "${root}" || shtk_cli_error "Failed to extract ${tgz_set}"
+    done
+
+    shtk_cli_debug "Creating device nodes"
+    chroot "${root}" /bin/sh -c "cd /dev && ./MAKEDEV all"
+}
+
+
+# Enters a NetBSD sandbox that uses release sets.
+#
+# \param root Path to the sandbox directory.
+netbsd_release_mount() {
+    local root="${1}"; shift
+
+    cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
+}

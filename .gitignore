@@ -1,0 +1,15 @@
+*_test
+Makefile
+Makefile.in
+aclocal.m4
+admin/install-sh
+admin/missing
+autom4te.cache
+config.log
+config.status
+configure
+default.conf
+sandbox.subr
+sandboxctl
+sandboxctl.8
+sandboxctl.conf.5
