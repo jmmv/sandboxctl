@@ -467,6 +467,28 @@ mount__non_existent_body() {
 }
 
 
+atf_test_case mount__already_mounted cleanup
+mount__already_mounted_head() {
+    atf_set "require.user" "root"
+}
+mount__already_mounted_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+
+    mkdir sandbox
+    mkdir sandbox/mnt
+    mount_tmpfs sandbox/mnt
+
+    atf_check -s exit:1 -e match:'Sandbox in inconsistent state' \
+        sandboxctl -c custom.conf test-mount
+
+    mount | grep sandbox/mnt >/dev/null || atf_fail "File systems were" \
+        "unmounted but should not have been"
+}
+mount__already_mounted_cleanup() {
+    umount sandbox/mnt >/dev/null 2>&1 || true
+}
+
+
 atf_test_case mount__validate_config
 mount__validate_config_body() {
     test_validate_config test-mount
@@ -776,6 +798,7 @@ atf_init_test_cases() {
     atf_add_test_case mount__ok
     atf_add_test_case mount__hooks
     atf_add_test_case mount__non_existent
+    atf_add_test_case mount__already_mounted
     atf_add_test_case mount__validate_config
     atf_add_test_case mount__fail_type
     atf_add_test_case mount__fail_hook

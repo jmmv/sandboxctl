@@ -147,6 +147,12 @@ _sandboxctl_mount() {
     [ -d "${root}" ] || shtk_cli_error "Cannot mount a non-existent sandbox"
 
     if sandbox_enter "${root}"; then
+        if sandbox_has_mounts "${root}"; then
+            sandbox_leave "${root}"
+            shtk_cli_error "Sandbox in inconsistent state; mounts found but" \
+                           "is not locked"
+        fi
+
         local ret=0
         (
             sandbox_dispatch "${type}" "${root}" mount
