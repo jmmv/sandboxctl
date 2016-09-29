@@ -171,6 +171,27 @@ sandboxctl_mount() {
 # The sandbox must exist.  Running multiple unmount operations from different
 # clients is reasonably safe as we have recorded how many clients did so.
 sandboxctl_unmount() {
+    local force_leave=
+    local force_unmount=
+    local OPTIND
+    while getopts ':f' arg "${@}"; do
+        case "${arg}" in
+            f)  # Force leave if given once; force unmount if given twice.
+                if [ -n "${force_leave}" ]; then
+                    force_unmount=-f
+                else
+                    force_leave=-f
+                fi
+                ;;
+
+            \?)
+                shtk_cli_usage_error "Unknown option -${OPTARG} in unmount"
+                ;;
+        esac
+    done
+    shift $((${OPTIND} - 1))
+    OPTIND=1  # Should not be necessary due to the 'local' above.
+
     [ ${#} -eq 0 ] || shtk_cli_usage_error "unmount does not take any arguments"
 
     local type
@@ -180,10 +201,10 @@ sandboxctl_unmount() {
 
     [ -d "${root}" ] || shtk_cli_error "Cannot unmount a non-existent sandbox"
 
-    if sandbox_leave "${root}"; then
+    if sandbox_leave ${force_leave} "${root}"; then
         shtk_config_run_hook pre_unmount_hook
         sandbox_dispatch "${type}" "${root}" unmount
-        sandbox_unmount_dirs "${root}"
+        sandbox_unmount_dirs ${force_unmount} "${root}"
     else
         shtk_cli_warning "Sandbox still in use by another process; file" \
             "systems may still be mounted!"

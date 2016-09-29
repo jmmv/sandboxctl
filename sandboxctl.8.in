@@ -68,6 +68,8 @@ shell
 .Op Fl o Ar variable=value
 .Op Fl v
 unmount
+.Op Fl f
+.Op Fl f
 .Sh DESCRIPTION
 .Nm
 creates and manages chroot-based sandboxed environments in a portable manner
@@ -245,6 +247,34 @@ need to use it by hand: the
 and
 .Sq shell
 commands take care of automatically doing this for you at exit time.
+.Pp
+The following options apply to the
+.Sq unmount
+command:
+.Bl -tag -width XXXX
+.It Fl f
+If given once, causes
+.Nm
+to disregard any existing locks on the sandbox and unmounts the file systems
+within it.
+If given twice, causes the unmount operations to also be forced; see the
+.Fl f
+flag in
+.Xr umount 8
+for more details about what this involves.
+.Pp
+You can use this flag to clean up the state of the sandbox if it ever becomes
+inconsistent, which is a (rare) possibility because
+.Nm
+cannot make hard guarantees on the consistency of the sandbox in case of
+failures during a regular unmount.
+.Pp
+.Em Warning :
+You should only use this flag if you are certain that no other concurrent
+instances of
+.Nm
+are still running for the given sandbox.
+.El
 .Sh FILES
 .Bl -tag -width XXXX
 .It Pa __SANDBOXCTL_ETCDIR__/

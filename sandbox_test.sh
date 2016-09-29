@@ -287,6 +287,28 @@ leave__error_body() {
 }
 
 
+atf_test_case leave__force
+leave__force_head() {
+    atf_set "require.user" "unprivileged"
+}
+leave__force_body() {
+    local root="$(pwd)/sandbox"
+    mkdir -p "${root}"
+    sandbox_enter "${root}"
+    touch "${root}/.sandbox_lock.tmp"
+    chmod 555 "${root}/.sandbox_lock.tmp"
+
+    if ( sandbox_leave "${root}" ) 2>err; then
+        chmod 755 "${root}"
+        atf_fail "sandbox_leave did not raise an error"
+    fi
+    if ( ! sandbox_leave -f "${root}" ) 2>err; then
+        atf_fail "sandbox_leave -f raised an error"
+    fi
+    [ ! -f "${root}/.sandbox_lock" ] || atf_fail "Lock file not deleted"
+}
+
+
 atf_test_case leave__not_entered
 leave__not_entered_body() {
     local root="$(pwd)/sandbox"
@@ -297,6 +319,15 @@ leave__not_entered_body() {
     fi
     atf_check -o match:'E: Sandbox not locked' cat err
     [ ! -f "${root}/.sandbox_lock" ] || atf_fail "Lock file created"
+}
+
+
+atf_test_case leave__unknown_flag
+leave__unknown_flag_body() {
+    if ( sandbox_leave -k 2>err ); then
+        atf_fail "sandbox_leave did not raise an error"
+    fi
+    atf_check -o match:'E: Unknown option -k' cat err
 }
 
 
@@ -423,6 +454,32 @@ unmount_dirs__slow_cleanup() {
 }
 
 
+atf_test_case unmount_dirs__force cleanup
+unmount_dirs__force_head() {
+    atf_set "require.user" "root"
+}
+unmount_dirs__force_body() {
+    mkdir -p sandbox/tmp
+    mount_tmpfs sandbox/tmp
+    touch sandbox/tmp/foo
+
+    ( cd sandbox/tmp && sleep 300 ) &  # Keep the mount point busy.
+
+    if ( sandbox_unmount_dirs sandbox ) 2>err; then
+        atf_fail "sandbox_unmount_dirs did not raise an error"
+    fi
+    [ -e sandbox/tmp/foo ] || atf_fail "File systems were prematurely unmounted"
+
+    if ( ! sandbox_unmount_dirs -f sandbox ) 2>err; then
+        atf_fail "sandbox_unmount_dirs -f raised an error"
+    fi
+    [ ! -e sandbox/tmp/foo ] || atf_fail "File systems seem to be left mounted"
+}
+unmount_dirs__force_cleanup() {
+    umount sandbox/tmp >/dev/null 2>&1 || true
+}
+
+
 atf_test_case unmount_dirs__error cleanup
 unmount_dirs__error_head() {
     atf_set "require.user" "root"
@@ -447,6 +504,15 @@ unmount_dirs__error_body() {
 unmount_dirs__error_cleanup() {
     kill -9 "$(cat pid)" 2>&1 || true
     umount sandbox/mnt >/dev/null 2>&1 || true
+}
+
+
+atf_test_case unmount_dirs__unknown_flag
+unmount_dirs__unknown_flag_body() {
+    if ( sandbox_unmount_dirs -k foo 2>err ); then
+        atf_fail "sandbox_unmount_dirs did not raise an error"
+    fi
+    atf_check -o match:'E: Unknown option -k' cat err
 }
 
 
@@ -733,8 +799,10 @@ atf_init_test_cases() {
 
     atf_add_test_case enter__error
 
+    atf_add_test_case leave__force
     atf_add_test_case leave__error
     atf_add_test_case leave__not_entered
+    atf_add_test_case leave__unknown_flag
 
     atf_add_test_case has_mounts__no
     atf_add_test_case has_mounts__yes
@@ -743,7 +811,9 @@ atf_init_test_cases() {
     atf_add_test_case unmount_dirs__ok
     atf_add_test_case unmount_dirs__ok_indirect
     atf_add_test_case unmount_dirs__slow
+    atf_add_test_case unmount_dirs__force
     atf_add_test_case unmount_dirs__error
+    atf_add_test_case unmount_dirs__unknown_flag
 
     atf_add_test_case destroy__ok
     atf_add_test_case destroy__abort_if_still_mounted

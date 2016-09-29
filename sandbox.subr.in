@@ -51,6 +51,7 @@
 #     the directory in which the sandbox lives and the action to perform on it,
 #     which can be any of the values listed in _SANDBOX_ACTIONS.
 
+shtk_import bool
 shtk_import cli
 shtk_import list
 
@@ -163,23 +164,49 @@ sandbox_enter() {
 
 # Records that the sandbox is in use by one fewer user.
 #
+# \param -f Forcibly leave the sandbox.  This just causes the lock to be removed
+#     regardless of any other potential concurrent instances of sandboxctl.
 # \param root Path to the sandbox to unlock.
 #
 # \return True if we were the last user to leave the sandbox, false otherwise.
 sandbox_leave() {
+    local force=no
+    local OPTIND
+    while getopts ':f' arg "${@}"; do
+        case "${arg}" in
+            f)  # Force destruction of the lock.
+                force=yes
+                ;;
+
+            \?)
+                shtk_cli_usage_error "Unknown option -${OPTARG}"
+                ;;
+        esac
+    done
+    shift $((${OPTIND} - 1))
+    OPTIND=1  # Should not be necessary due to the 'local' above.
+
     local root="${1}"; shift
 
     local lock="${root}/.sandbox_lock"
-    [ -f "${lock}" ] || shtk_cli_error "Sandbox not locked"
-    sed -e 1d "${lock}" >"${lock}.tmp" \
-        || shtk_cli_error "Failed to unlock sandbox"
-    if [ -s "${lock}.tmp" ]; then
-        mv "${lock}.tmp" "${lock}" \
-            || shtk_cli_error "Failed to unlock sandbox"
-        return 1
-    else
-        rm -f "${lock}.tmp" "${lock}"
+    if shtk_bool_check "${force}"; then
+        if [ -f "${lock}" ]; then
+            shtk_cli_warning "Sandbox locked; forcibly destroying lock"
+            rm -f "${lock}"
+        fi
         return 0
+    else
+        [ -f "${lock}" ] || shtk_cli_error "Sandbox not locked"
+        sed -e 1d "${lock}" >"${lock}.tmp" \
+            || shtk_cli_error "Failed to unlock sandbox"
+        if [ -s "${lock}.tmp" ]; then
+            mv "${lock}.tmp" "${lock}" \
+                || shtk_cli_error "Failed to unlock sandbox"
+            return 1
+        else
+            rm -f "${lock}.tmp" "${lock}"
+            return 0
+        fi
     fi
 }
 
@@ -204,6 +231,22 @@ sandbox_has_mounts() {
 #
 # \param root Path to the sandbox root.
 sandbox_unmount_dirs() {
+    local force_flag=
+    local OPTIND
+    while getopts ':f' arg "${@}"; do
+        case "${arg}" in
+            f)  # Force-unmount file systems.
+                force_flag=-f
+                ;;
+
+            \?)
+                shtk_cli_usage_error "Unknown option -${OPTARG}"
+                ;;
+        esac
+    done
+    shift $((${OPTIND} - 1))
+    OPTIND=1  # Should not be necessary due to the 'local' above.
+
     local root="${1}"; shift
 
     local real_root="$(cd "${root}" && pwd -P)"
@@ -213,7 +256,8 @@ sandbox_unmount_dirs() {
         | while read dir
     do
         shtk_cli_debug "Unmounting ${dir}"
-        umount "${dir}" || shtk_cli_error "Failed to unmount sandbox"
+        umount ${force_flag} "${dir}" || shtk_cli_error "Failed to unmount" \
+            "sandbox"
         local retries=50
         while [ ${retries} -gt 0 ] && sandbox_has_mounts "${dir}"; do
             shtk_cli_debug "Mount point ${dir} has not disappeared yet; waiting"

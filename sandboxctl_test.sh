@@ -577,6 +577,67 @@ unmount__not_mounted_body() {
 }
 
 
+atf_test_case unmount__force
+unmount__force_head() {
+    atf_set "require.user" "unprivileged"
+}
+unmount__force_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+
+    mkdir sandbox
+
+    atf_check -o inline:"mock_mount $(pwd)/sandbox\n" \
+        sandboxctl -c custom.conf mount
+
+    touch sandbox/.sandbox_lock.tmp
+    chmod 555 sandbox/.sandbox_lock.tmp
+
+    atf_check -s exit:1 -e match:"Failed to unlock sandbox" \
+        sandboxctl -c custom.conf unmount
+
+    atf_check -o inline:"mock_unmount $(pwd)/sandbox\n" \
+        -e match:"destroying lock" \
+        sandboxctl -c custom.conf unmount -f
+
+    atf_check -s exit:1 -e match:"Sandbox not locked" \
+        sandboxctl -c custom.conf unmount
+}
+
+
+atf_test_case unmount__force_force cleanup
+unmount__force_force_head() {
+    atf_set "require.user" "root"
+}
+unmount__force_force_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+
+    mkdir sandbox
+    mkdir sandbox/tmp
+
+    atf_check -o inline:"mock_mount $(pwd)/sandbox\n" \
+        sandboxctl -c custom.conf mount
+    mount_tmpfs sandbox/tmp
+    touch sandbox/tmp/cookie
+
+    ( cd sandbox/tmp && sleep 300 ) &  # Keep the mount point busy.
+
+    atf_check -s exit:1 -o inline:"mock_unmount $(pwd)/sandbox\n" \
+        -e match:"Failed to unmount sandbox" \
+        sandboxctl -c custom.conf unmount
+    [ -f sandbox/tmp/cookie ] || atf_fail "File systems prematurely unmounted"
+
+    atf_check -o inline:"mock_unmount $(pwd)/sandbox\n" \
+        sandboxctl -c custom.conf unmount -f -f
+    [ ! -f sandbox/tmp/cookie ] || atf_fail "File systems not unmounted"
+
+    atf_check -s exit:1 -e match:"Sandbox not locked" \
+        sandboxctl -c custom.conf unmount
+}
+unmount__force_force_cleanup() {
+    umount sandbox/tmp >/dev/null 2>&1 || true
+}
+
+
 atf_test_case unmount__validate_config
 unmount__validate_config_body() {
     test_validate_config unmount
@@ -621,6 +682,16 @@ EOF
         sandboxctl -c custom.conf unmount
 
     [ -d sandbox ] || atf_fail "Sandbox was cleaned up"
+}
+
+
+atf_test_case unmount__unknown_flag
+unmount__unknown_flag_body() {
+    cat >experr <<EOF
+sandboxctl: E: Unknown option -k in unmount
+Type 'man sandboxctl' for help
+EOF
+    atf_check -s exit:1 -e file:experr sandboxctl unmount -k
 }
 
 
@@ -806,9 +877,12 @@ atf_init_test_cases() {
     atf_add_test_case unmount__ok
     atf_add_test_case unmount__hooks
     atf_add_test_case unmount__not_mounted
+    atf_add_test_case unmount__force
+    atf_add_test_case unmount__force_force
     atf_add_test_case unmount__validate_config
     atf_add_test_case unmount__fail_type
     atf_add_test_case unmount__fail_hook
+    atf_add_test_case unmount__unknown_flag
 
     atf_add_test_case mount_unmount__nested
 
