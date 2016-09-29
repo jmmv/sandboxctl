@@ -399,6 +399,30 @@ unmount_dirs__ok_indirect_cleanup() {
 }
 
 
+atf_test_case unmount_dirs__slow cleanup
+unmount_dirs__slow_head() {
+    atf_set "require.user" "root"
+}
+unmount_dirs__slow_body() {
+    mkdir -p sandbox/tmp
+    mount_tmpfs sandbox/tmp
+    touch sandbox/tmp/foo
+
+    local real_umount="$(which umount)"
+    umount() {
+        ( sleep 1; "${real_umount}" "${@}" ) &
+    }
+
+    sandbox_unmount_dirs sandbox 2>err || atf_fail "Failed to unmount sandbox"
+    atf_check -o match:"sandbox/tmp.* has not disappeared yet; waiting" cat err
+
+    [ ! -e sandbox/tmp/foo ] || atf_fail "File systems seem to be left mounted"
+}
+unmount_dirs__slow_cleanup() {
+    umount sandbox/tmp >/dev/null 2>&1 || true
+}
+
+
 atf_test_case unmount_dirs__error cleanup
 unmount_dirs__error_head() {
     atf_set "require.user" "root"
@@ -718,6 +742,7 @@ atf_init_test_cases() {
 
     atf_add_test_case unmount_dirs__ok
     atf_add_test_case unmount_dirs__ok_indirect
+    atf_add_test_case unmount_dirs__slow
     atf_add_test_case unmount_dirs__error
 
     atf_add_test_case destroy__ok
