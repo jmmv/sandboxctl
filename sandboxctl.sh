@@ -136,7 +136,7 @@ sandboxctl_destroy() {
 # The sandbox must have been created first with the 'create' command.  Running
 # multiple mount operations from different clients is reasonably safe as we
 # record how many clients have called this.
-_sandboxctl_mount() {
+sandboxctl_mount() {
     [ ${#} -eq 0 ] || shtk_cli_usage_error "mount does not take any arguments"
 
     local type
@@ -159,7 +159,7 @@ _sandboxctl_mount() {
             shtk_config_run_hook post_mount_hook
         ) || ret=${?}
         if [ ${ret} -ne 0 ]; then
-            _sandboxctl_unmount
+            sandboxctl_unmount
             exit ${ret}
         fi
     fi
@@ -170,7 +170,7 @@ _sandboxctl_mount() {
 #
 # The sandbox must exist.  Running multiple unmount operations from different
 # clients is reasonably safe as we have recorded how many clients did so.
-_sandboxctl_unmount() {
+sandboxctl_unmount() {
     [ ${#} -eq 0 ] || shtk_cli_usage_error "unmount does not take any arguments"
 
     local type
@@ -200,10 +200,10 @@ _sandboxctl_unmount() {
 sandboxctl_run() {
     [ ${#} -gt 0 ] || shtk_cli_usage_error "run requires at least one argument"
 
-    _sandboxctl_mount
+    sandboxctl_mount
     local ret=0
     chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
-    _sandboxctl_unmount
+    sandboxctl_unmount
     return "${ret}"
 }
 
@@ -214,11 +214,11 @@ sandboxctl_run() {
 sandboxctl_shell() {
     [ ${#} -eq 0 ] || shtk_cli_usage_error "shell does not take any arguments"
 
-    _sandboxctl_mount
+    sandboxctl_mount
     local ret=0
     PS1="sandbox# " chroot "$(shtk_config_get SANDBOX_ROOT)" /bin/sh \
         || ret="${?}"
-    _sandboxctl_unmount
+    sandboxctl_unmount
     return "${ret}"
 }
 
@@ -291,17 +291,10 @@ main() {
 
     local command="${1}"; shift
     case "${command}" in
-        config|create|destroy|run|shell)
+        config|create|destroy|mount|run|shell|unmount)
             sandboxctl_set_defaults
             sandboxctl_config_load "${config_name}"
             "sandboxctl_${command}" "${@}" || exit_code="${?}"
-            ;;
-
-        test-mount|test-unmount)  # Exposed for testing only.
-            local test_command="$(echo "${command}" | sed -e s,^test-,,)"
-            sandboxctl_set_defaults
-            sandboxctl_config_load "${config_name}"
-            "_sandboxctl_${test_command}" "${@}" || exit_code="${?}"
             ;;
 
         *)

@@ -435,9 +435,9 @@ mount__ok_body() {
     mkdir sandbox
 
     atf_check -o inline:"mock_mount $(pwd)/sandbox\n" \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 
-    atf_check sandboxctl -c custom.conf test-mount
+    atf_check sandboxctl -c custom.conf mount
 }
 
 
@@ -452,9 +452,9 @@ mount__hooks_body() {
 mock_mount $(pwd)/sandbox
 custom post_mount_hook
 EOF
-    atf_check -o file:expout sandboxctl -c custom.conf test-mount
+    atf_check -o file:expout sandboxctl -c custom.conf mount
 
-    atf_check sandboxctl -c custom.conf test-mount
+    atf_check sandboxctl -c custom.conf mount
 }
 
 
@@ -463,7 +463,7 @@ mount__non_existent_body() {
     create_config_with_mock_type custom.conf "$(pwd)/sandbox"
 
     atf_check -s exit:1 -e match:'Cannot mount a non-existent sandbox' \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 }
 
 
@@ -479,7 +479,7 @@ mount__already_mounted_body() {
     mount_tmpfs sandbox/mnt
 
     atf_check -s exit:1 -e match:'Sandbox in inconsistent state' \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 
     mount | grep sandbox/mnt >/dev/null || atf_fail "File systems were" \
         "unmounted but should not have been"
@@ -491,7 +491,7 @@ mount__already_mounted_cleanup() {
 
 atf_test_case mount__validate_config
 mount__validate_config_body() {
-    test_validate_config test-mount
+    test_validate_config mount
 }
 
 
@@ -509,7 +509,7 @@ mock_unmount $(pwd)/sandbox
 EOF
     atf_check -s exit:1 -o file:expout \
         -e inline:"sandboxctl: E: Failed to mount sandbox type mock\n" \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 
     [ -d sandbox ] || atf_fail "Sandbox was cleaned up"
 }
@@ -530,7 +530,7 @@ mock_unmount $(pwd)/sandbox
 EOF
     atf_check -s exit:1 -o file:expout \
         -e inline:"sandboxctl: E: The hook post_mount_hook returned an error\n" \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 
     [ -d sandbox ] || atf_fail "Sandbox was cleaned up"
 }
@@ -542,10 +542,10 @@ unmount__ok_body() {
 
     mkdir sandbox
 
-    atf_check -o ignore sandboxctl -c custom.conf test-mount
+    atf_check -o ignore sandboxctl -c custom.conf mount
 
     atf_check -o inline:"mock_unmount $(pwd)/sandbox\n" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 }
 
 
@@ -556,13 +556,13 @@ unmount__hooks_body() {
 
     mkdir sandbox
 
-    atf_check -o ignore sandboxctl -c custom.conf test-mount
+    atf_check -o ignore sandboxctl -c custom.conf mount
 
     cat >expout <<EOF
 custom pre_unmount_hook
 mock_unmount $(pwd)/sandbox
 EOF
-    atf_check -o file:expout sandboxctl -c custom.conf test-unmount
+    atf_check -o file:expout sandboxctl -c custom.conf unmount
 }
 
 
@@ -573,13 +573,13 @@ unmount__not_mounted_body() {
     mkdir sandbox
 
     atf_check -s exit:1 -e match:"Sandbox not locked" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 }
 
 
 atf_test_case unmount__validate_config
 unmount__validate_config_body() {
-    test_validate_config test-unmount
+    test_validate_config unmount
 }
 
 
@@ -590,7 +590,7 @@ unmount__fail_type_body() {
     echo 'pre_unmount_hook() { echo "custom pre_unmount_hook"; }' >>custom.conf
 
     mkdir sandbox
-    atf_check -o ignore sandboxctl -c custom.conf test-mount
+    atf_check -o ignore sandboxctl -c custom.conf mount
 
     cat >expout <<EOF
 custom pre_unmount_hook
@@ -598,7 +598,7 @@ mock_unmount $(pwd)/sandbox
 EOF
     atf_check -s exit:1 -o file:expout \
         -e inline:"sandboxctl: E: Failed to unmount sandbox type mock\n" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 
     [ -d sandbox ] || atf_fail "Sandbox was cleaned up"
 }
@@ -611,14 +611,14 @@ unmount__fail_hook_body() {
         >>custom.conf
 
     mkdir sandbox
-    atf_check -o ignore sandboxctl -c custom.conf test-mount
+    atf_check -o ignore sandboxctl -c custom.conf mount
 
     cat >expout <<EOF
 custom pre_unmount_hook
 EOF
     atf_check -s exit:1 -o file:expout \
         -e inline:"sandboxctl: E: The hook pre_unmount_hook returned an error\n" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 
     [ -d sandbox ] || atf_fail "Sandbox was cleaned up"
 }
@@ -631,22 +631,22 @@ mount_unmount__nested_body() {
     mkdir sandbox
 
     atf_check -o inline:"mock_mount $(pwd)/sandbox\n" \
-        sandboxctl -c custom.conf test-mount
+        sandboxctl -c custom.conf mount
 
-    atf_check sandboxctl -c custom.conf test-mount
-    atf_check sandboxctl -c custom.conf test-mount
+    atf_check sandboxctl -c custom.conf mount
+    atf_check sandboxctl -c custom.conf mount
 
     cat >experr <<EOF
 sandboxctl: W: Sandbox still in use by another process; file systems may still be mounted!
 EOF
-    atf_check -e file:experr sandboxctl -c custom.conf test-unmount
-    atf_check -e file:experr sandboxctl -c custom.conf test-unmount
+    atf_check -e file:experr sandboxctl -c custom.conf unmount
+    atf_check -e file:experr sandboxctl -c custom.conf unmount
 
     atf_check -o inline:"mock_unmount $(pwd)/sandbox\n" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 
     atf_check -s exit:1 -e match:"Sandbox not locked" \
-        sandboxctl -c custom.conf test-unmount
+        sandboxctl -c custom.conf unmount
 }
 
 
