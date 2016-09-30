@@ -97,7 +97,11 @@ sandboxctl_create() {
     [ ! -e "${root}" ] || shtk_cli_error "Sandbox ${root} already exists"
     mkdir "${root}" || shtk_cli_error "Failed to create sandbox root"
     if ! ( sandbox_dispatch "${type}" "${root}" create ); then
-        sandboxctl_destroy || true
+        ( sandboxctl_destroy ) || true
+        # Cope with the case where the sandbox type was bad: our
+        # sandbox_dispatch couldn't do a thing, but sandboxctl_destroy could not
+        # run either.  Simply remove the just-created directory.
+        rmdir "${root}" 2>/dev/null || true
         return 1
     fi
     if ! ( shtk_config_run_hook post_create_hook ); then

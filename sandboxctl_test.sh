@@ -268,11 +268,11 @@ create__validate_config_body() {
 }
 
 
-atf_test_case create__fail_creation
-create__fail_creation_head() {
+atf_test_case create__fail_mkdir
+create__fail_mkdir_head() {
     atf_set "require.user" "unprivileged"
 }
-create__fail_creation_body() {
+create__fail_mkdir_body() {
     create_config_with_mock_type custom.conf "$(pwd)/subdir/sandbox"
     mkdir subdir
     chmod 500 subdir
@@ -285,8 +285,21 @@ create__fail_creation_body() {
 }
 
 
-atf_test_case create__fail_type
-create__fail_type_body() {
+atf_test_case create__fail_bad_type
+create__fail_bad_type_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    echo "SANDBOX_TYPE=unknown-type" >>custom.conf
+
+    atf_check -s exit:1 \
+        -e match:"sandboxctl: E: Invalid sandbox type .*unknown-type" \
+        sandboxctl -c custom.conf create
+
+    [ ! -d "$(pwd)/sandbox" ] || atf_fail "Sandbox was created"
+}
+
+
+atf_test_case create__fail_in_type
+create__fail_in_type_body() {
     create_config_with_mock_type custom.conf "$(pwd)/sandbox" failing
     echo 'mock_create() { echo "mock_create ${*}"; exit 1; }' >>custom.conf
     echo 'post_create_hook() { echo "custom post_create_hook"; }' >>custom.conf
@@ -854,8 +867,9 @@ atf_init_test_cases() {
     atf_add_test_case create__hooks
     atf_add_test_case create__already_exists
     atf_add_test_case create__validate_config
-    atf_add_test_case create__fail_creation
-    atf_add_test_case create__fail_type
+    atf_add_test_case create__fail_mkdir
+    atf_add_test_case create__fail_bad_type
+    atf_add_test_case create__fail_in_type
     atf_add_test_case create__fail_hook
 
     atf_add_test_case destroy__ok
