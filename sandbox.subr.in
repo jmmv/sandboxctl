@@ -291,7 +291,7 @@ sandbox_destroy() {
     # fail here and we do not fail in the rm call below... great!
     chmod -R u+rwx "${real_root}" 2>/dev/null || true
 
-    case "$(uname -m)" in
+    case "$(uname -s)" in
         FreeBSD|NetBSD)
             # Be extra paranoid: use NetBSD's -x flag to avoid crossing
             # mount points.  We don't want the remove operation to
@@ -327,7 +327,7 @@ sandbox_extract() {
     fi
 
     local tar_extra_flags=
-    case "$(uname -m)" in
+    case "$(uname -s)" in
         NetBSD)
             tar_extra_flags=e  # Stop on first error.
             ;;
