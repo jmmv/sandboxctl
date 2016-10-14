@@ -286,9 +286,19 @@ sandbox_destroy() {
     ! sandbox_has_mounts "${real_root}" || shtk_abort "Attempting to delete" \
         "an still-mounted sandbox; this should not have happened"
 
-    # Allow the hierarchy to be removed if not running as root for test
-    # purposes.  This is a best-effort operation, hence why it's silent: if we
+    # Attempt to weaken the permissions of the sandbox so that the recursive rm
+    # call below has higher chances of succees.  This is useful when running
+    # tests as non-root, but also for real sandboxes where files may have been
+    # installed with high protection bits.
+    #
+    # Note that this is a best-effort operation, hence why it's silent: if we
     # fail here and we do not fail in the rm call below... great!
+
+    case "$(uname -s)" in
+        Darwin|FreeBSD|NetBSD)
+            chflags -R noschg,nouchg "${real_root}" 2>/dev/null || true
+            ;;
+    esac
     chmod -R u+rwx "${real_root}" 2>/dev/null || true
 
     case "$(uname -s)" in

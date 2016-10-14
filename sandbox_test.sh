@@ -527,6 +527,27 @@ destroy__ok_body() {
 }
 
 
+atf_test_case destroy__protected_files cleanup
+destroy__protected_files_head() {
+    atf_set "require.progs" "chflags"
+    atf_set "require.user" "root"
+}
+destroy__protected_files_body() {
+    mkdir -p sandbox/tmp
+    touch sandbox/tmp/foo
+    chflags schg sandbox/tmp/foo
+    touch sandbox/tmp/bar
+    chflags uchg sandbox/tmp/bar
+
+    sandbox_destroy sandbox || atf_fail "sandbox_destroy failed"
+    [ ! -d sandbox ] || atf_fail "sandbox not deleted"
+}
+destroy__protected_files_cleanup() {
+    chflags noschg sandbox/tmp/foo >/dev/null 2>&1 || true
+    chflags nouchg sandbox/tmp/bar >/dev/null 2>&1 || true
+}
+
+
 atf_test_case destroy__abort_if_still_mounted cleanup
 destroy__abort_if_still_mounted_head() {
     atf_set "require.user" "root"
@@ -816,6 +837,7 @@ atf_init_test_cases() {
     atf_add_test_case unmount_dirs__unknown_flag
 
     atf_add_test_case destroy__ok
+    atf_add_test_case destroy__protected_files
     atf_add_test_case destroy__abort_if_still_mounted
     atf_add_test_case destroy__abort_if_root
 
