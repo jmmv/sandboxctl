@@ -554,11 +554,9 @@ destroy__abort_if_still_mounted_head() {
 }
 destroy__abort_if_still_mounted_body() {
     cat >script.sh <<EOF
-#! /bin/sh
 shtk_import sandbox
 main() {
     chmod() { touch chmod-called; }
-    rm() { touch rm-called; }
     sandbox_destroy "\${1}"
 }
 EOF
@@ -566,11 +564,10 @@ EOF
 
     mkdir -p sandbox/tmp
     mount_tmpfs sandbox/tmp
-    atf_check -s signal \
+    atf_check -s not-exit:0 \
         -e match:"script: A: Attempting to delete an still-mounted sandbox" \
         ./script sandbox
-    [ ! -f chmod-called ] || fail "chmod called; did not abort"
-    [ ! -f rm-called ] || fail "rm called; did not abort"
+    [ ! -f chmod-called ] || atf_fail "chmod called; did not abort"
 }
 destroy__abort_if_still_mounted_cleanup() {
     umount sandbox/tmp >/dev/null 2>&1 || true
@@ -580,11 +577,9 @@ destroy__abort_if_still_mounted_cleanup() {
 atf_test_case destroy__abort_if_root
 destroy__abort_if_root_body() {
     cat >script.sh <<EOF
-#! /bin/sh
 shtk_import sandbox
 main() {
     chmod() { touch chmod-called; }
-    rm() { touch rm-called; }
     sandbox_destroy "\${1}"
 }
 EOF
@@ -594,10 +589,9 @@ EOF
         echo "Testing sandbox_destroy with a root of ${candidate}"
 
         rm *-called 2>/dev/null || true
-        atf_check -s signal \
+        atf_check -s not-exit:0 \
             -e match:"script: A: Attempting to delete /" ./script "${candidate}"
-        [ ! -f chmod-called ] || fail "chmod called; did not abort"
-        [ ! -f rm-called ] || fail "rm called; did not abort"
+        [ ! -f chmod-called ] || atf_fail "chmod called; did not abort"
     done
 }
 
