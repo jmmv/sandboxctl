@@ -29,12 +29,26 @@
 # \file freebsd_native.subr
 # Sandbox type to null-mount a live FreeBSD system.
 
+shtk_import cli
 shtk_import sandbox
 
 # List of directories to null-mount in read-only mode.
 _FREEBSD_NATIVE_BINDFS_MOUNTS="
-    bin etc lib libexec sbin
+    bin lib libexec sbin
     usr/bin usr/include usr/lib usr/libdata usr/libexec usr/sbin usr/share"
+
+
+# Prints the configuration variables exposed by this sandbox type.
+freebsd_native_config_vars() {
+    echo "FREEBSD_NATIVE_SOURCE"
+}
+
+
+# Sets defaults for the configuration variables used by this sandbox type.
+freebsd_native_set_defaults() {
+    # Remember to update sandboxctl.conf(5) if you change any default values.
+    shtk_config_set FREEBSD_NATIVE_SOURCE "/usr/src"
+}
 
 
 # Sets up a FreeBSD sandbox that uses null mounts.
@@ -43,13 +57,30 @@ _FREEBSD_NATIVE_BINDFS_MOUNTS="
 freebsd_native_create() {
     local root="${1}"; shift
 
-    for dir in ${_FREEBSD_NATIVE_BINDFS_MOUNTS}; do
-        mkdir -p "${root}/${dir}" || return
-    done
-    mkdir "${root}/dev"
-    mkdir "${root}/home"
-    mkdir "${root}/tmp"
-    chmod 1777 "${root}/tmp"
+    local source="$(shtk_config_get FREEBSD_NATIVE_SOURCE)"
+    shtk_cli_debug "Bootstrapping sandbox from ${source}"
+
+    quiet() { "${@}"; }
+    shtk_cli_log_level debug || quiet() { "${@}" >/dev/null 2>&1; }
+
+    if [ -e "${source}/Makefile.inc1" ]; then
+        for target in distrib-dirs _obj everything distribution; do
+            MAKEOBJDIRPREFIX="${root}/usr/obj" quiet make -C "${source}" \
+                DESTDIR="${root}" SUBDIR_OVERRIDE=etc "${target}" \
+                || shtk_cli_error "make ${target} failed"
+        done
+    elif [ -e "${source}/base.txz" ]; then
+        # TODO(jmmv): Extend sandbox_extract to support xz files and use it here
+        # instead of the direct call to tar.
+        quiet tar -xJvf "${source}/base.txz" -C "${root}" ./etc ./root ./var
+        quiet mtree -deU -f "${root}/etc/mtree/BSD.root.dist" -p "${root}"
+        quiet mtree -deU -f "${root}/etc/mtree/BSD.usr.dist" -p "${root}/usr"
+        quiet mtree -deU -f "${root}/etc/mtree/BSD.var.dist" -p "${root}/var"
+    else
+        shtk_cli_error "Cannot find ${source}"
+    fi
+    chflags -R noschg,nouchg "${root}" ${quiet}
+    rm -rf "${root}/usr/obj" ${quiet}
 }
 
 

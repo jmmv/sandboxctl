@@ -25,7 +25,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 27, 2016
+.Dd October 16, 2016
 .Dt SANDBOXCTL.CONF 5
 .Os
 .Sh NAME
@@ -87,6 +87,24 @@ sandbox on a
 host and replicates the host system under the sandbox using null mounts.
 Sandboxes created using this type mimic the host system and are fast to create
 and destroy.
+.Pp
+The following variables configure this type:
+.Bl -tag -width XXXX
+.It Va FREEBSD_NATIVE_SOURCE
+Path to the directory containing the sources that match the host system
+.Em or
+to a directory containing a
+.Pa base.txz
+release set that matches the host system.
+.Pp
+Even though this sandbox type uses the native host system as a reference for the
+setup of the sandbox, either the source tree or the release sets are needed to
+unpack fresh configuration and support files that cannot be inherited from the
+host.
+.Pp
+Default:
+.Pa /usr/src
+.El
 @endif
 @if NetBSD
 .Ss Configuration variables for the netbsd-native sandbox type

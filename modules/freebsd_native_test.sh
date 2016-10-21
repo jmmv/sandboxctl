@@ -42,6 +42,7 @@ config__builtins_body() {
     isolate_module freebsd_native
 
     cat >expout <<EOF
+FREEBSD_NATIVE_SOURCE = /usr/src
 SANDBOX_ROOT is undefined
 SANDBOX_TYPE = empty
 EOF
@@ -49,14 +50,13 @@ EOF
 }
 
 
-atf_test_case integration cleanup
-integration_head() {
-    atf_set "require.user" "root"
-}
-integration_body() {
+common_integration_body() {
+    local source="${1}"; shift
+
     [ "$(uname -s)" = 'FreeBSD' ] || atf_skip "Requires a FreeBSD host"
 
-    cat >custom.conf <<EOF
+    cat >>custom.conf <<EOF
+FREEBSD_NATIVE_SOURCE="${source}"
 SANDBOX_ROOT="$(pwd)/sandbox"
 SANDBOX_TYPE="freebsd-native"
 EOF
@@ -66,12 +66,18 @@ EOF
 
     # The commands invoked within the sandbox must check:
     # - Presence of binaries (obviously).
-    # - Presence of configuration files.  Chowning a file ensures that, at
-    #   least, the passwords database is present and valid.
+    # - Presence and writability of configuration files.  Adding a test user
+    #   ensures that, at least, the passwords database is present and valid.
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
+    # - Ability to update the passwords database, which indirectly means a
+    #   writable /etc.
+    grep "^testuser" sandbox/etc/passwd \
+        && atf_fail 'passwd already contains test user'
     atf_check -e ignore sandboxctl -c custom.conf run /bin/sh -c \
-        'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
-         && chown root /tmp/testfile'
+         'pw useradd -n testuser -s /bin/sh -m -w no \
+          && dd if=/dev/zero of=/tmp/testfile bs=1k count=1'
+    grep "^testuser" sandbox/etc/passwd \
+        || atf_fail 'passwd was not correctly updated'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
@@ -79,13 +85,42 @@ EOF
     atf_check sandboxctl -c custom.conf destroy
     rm custom.conf
 }
-integration_cleanup() {
+
+
+common_integration_cleanup() {
     [ ! -f custom.conf ] || sandboxctl -c custom.conf destroy || true
+}
+
+
+atf_test_case integration_srcdir cleanup
+integration__srcdir_head() {
+    atf_set "require.config" "freebsd_srcdir"
+    atf_set "require.user" "root"
+}
+integration__srcdir_body() {
+    common_integration_body "$(atf_config_get freebsd_srcdir)"
+}
+integration__srcdir_cleanup() {
+    common_integration_cleanup
+}
+
+
+atf_test_case integration_sets cleanup
+integration__sets_head() {
+    atf_set "require.config" "freebsd_releasedir"
+    atf_set "require.user" "root"
+}
+integration__sets_body() {
+    common_integration_body "$(atf_config_get freebsd_releasedir)"
+}
+integration__sets_cleanup() {
+    common_integration_cleanup
 }
 
 
 atf_init_test_cases() {
     atf_add_test_case config__builtins
 
-    atf_add_test_case integration
+    atf_add_test_case integration__srcdir
+    atf_add_test_case integration__sets
 }
