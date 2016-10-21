@@ -71,11 +71,24 @@ EOF
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
     # - Ability to update the passwords database, which indirectly means a
     #   writable /etc.
+    # - Configuration of /bin/sh as the default shell.
+    cat >sandbox/tmp/checks.sh <<EOF
+#! /bin/sh
+
+fail() { echo "\${@}" 1>&2; exit 1; }
+
+pw useradd -n testuser -s /bin/sh -m -w no || fail "User addition failed"
+dd if=/dev/zero of=/tmp/testfile bs=1k count=1 || fail "Devices failed"
+
+[ "\${SHELL}" = /bin/sh ] || fail "SHELL is \${SHELL} but should be /bin/sh"
+EOF
+    chmod +x sandbox/tmp/checks.sh
+
     grep "^testuser" sandbox/etc/passwd \
         && atf_fail 'passwd already contains test user'
-    atf_check -e ignore sandboxctl -c custom.conf run /bin/sh -c \
-         'pw useradd -n testuser -s /bin/sh -m -w no \
-          && dd if=/dev/zero of=/tmp/testfile bs=1k count=1'
+
+    atf_check -e ignore sandboxctl -c custom.conf run /tmp/checks.sh
+
     grep "^testuser" sandbox/etc/passwd \
         || atf_fail 'passwd was not correctly updated'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'

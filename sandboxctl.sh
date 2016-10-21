@@ -227,7 +227,7 @@ sandboxctl_run() {
 
     sandboxctl_mount
     local ret=0
-    chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
+    SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
     sandboxctl_unmount
     return "${ret}"
 }
@@ -241,7 +241,7 @@ sandboxctl_shell() {
 
     sandboxctl_mount
     local ret=0
-    PS1="sandbox# " chroot "$(shtk_config_get SANDBOX_ROOT)" /bin/sh \
+    PS1="sandbox# " SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" \
         || ret="${?}"
     sandboxctl_unmount
     return "${ret}"

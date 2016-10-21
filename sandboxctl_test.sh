@@ -98,7 +98,7 @@ create_mock_chroot() {
 #! /bin/sh
 dir="\${1}"; shift
 cd "\${dir}"
-exec "\${@}"
+exec "\${@:-\${SHELL}}"
 EOF
     chmod +x chroot
     PATH="$(pwd):${PATH}"
@@ -754,6 +754,23 @@ EOF
 }
 
 
+atf_test_case run__shell_is_sh
+run__shell_is_sh_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+
+    cat >expout <<EOF
+mock_mount $(pwd)/sandbox
+/bin/sh
+mock_unmount $(pwd)/sandbox
+EOF
+    atf_check -o file:expout sandboxctl -c custom.conf run \
+        /bin/sh -c 'echo "${SHELL}"'
+}
+
+
 atf_test_case run__command_fails
 run__command_fails_body() {
     create_config_with_mock_type custom.conf "$(pwd)/sandbox"
@@ -796,6 +813,23 @@ mock_mount $(pwd)/sandbox
 mock_unmount $(pwd)/sandbox
 EOF
     echo 'echo 123' | atf_check -o file:expout sandboxctl -c custom.conf shell
+}
+
+
+atf_test_case shell__shell_is_sh
+shell__shell_is_sh_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+
+    cat >expout <<EOF
+mock_mount $(pwd)/sandbox
+/bin/sh
+mock_unmount $(pwd)/sandbox
+EOF
+    echo 'echo "${SHELL}"' \
+        | atf_check -o file:expout sandboxctl -c custom.conf shell
 }
 
 
@@ -901,10 +935,12 @@ atf_init_test_cases() {
     atf_add_test_case mount_unmount__nested
 
     atf_add_test_case run__ok
+    atf_add_test_case run__shell_is_sh
     atf_add_test_case run__command_fails
     atf_add_test_case run__validate_config
 
     atf_add_test_case shell__ok
+    atf_add_test_case shell__shell_is_sh
     atf_add_test_case shell__fail
     atf_add_test_case shell__validate_config
 

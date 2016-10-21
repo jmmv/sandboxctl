@@ -95,4 +95,7 @@ freebsd_native_mount() {
     done
 
     mount -t devfs devfs "${root}/dev"
+
+    grep "^root:.*:/bin/sh$" "${root}/etc/passwd" >/dev/null 2>&1 \
+        || chroot "${root}" chsh -s /bin/sh root
 }

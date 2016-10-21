@@ -25,7 +25,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 29, 2016
+.Dd October 21, 2016
 .Dt SANDBOXCTL 8
 .Os
 .Sh NAME
@@ -234,11 +234,15 @@ Executes a given command inside the sandbox.
 The sandbox must exist.
 This operation always mounts the sandbox before running the command and unmounts
 it after completion.
+The shell is forced to
+.Pq /bin/sh .
 .Ss The shell command
 Executes an interactive shell inside the sandbox.
 The sandbox must exist.
 This operation always mounts the sandbox before running the shell and unmounts
 it after completion.
+The shell is forced to
+.Pq /bin/sh .
 .Ss The unmount command
 Unmounts sandbox-specific file systems.
 This command is only provided for completeness and convenience; you should not
