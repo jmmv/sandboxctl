@@ -430,6 +430,46 @@ unmount_dirs__ok_indirect_cleanup() {
 }
 
 
+atf_test_case unmount_dirs__busy cleanup
+unmount_dirs__busy_head() {
+    atf_set "require.user" "root"
+}
+unmount_dirs__busy_body() {
+    mkdir -p sandbox/tmp
+    mount_tmpfs sandbox/tmp
+
+    cd sandbox/tmp
+    sleep 300 &  # Keep the mount point busy.
+    local busy_pid="${!}"
+    cd -
+    echo "${busy_pid}" >busy.pid
+
+    # The test strategy below is to ensure that umount(8) gets called multiple
+    # times until the mount point is not busy any longer.  To do this, we stub
+    # out the umount(8) command so that the subprocess is killed after a few
+    # attempts.
+    local umount_tries=10
+    local real_umount="$(which umount)"
+    umount() {
+        umount_tries=$((${umount_tries} - 1))
+        [ ${umount_tries} -gt 0 ] || kill "${busy_pid}"
+        "${real_umount}" "${@}"
+    }
+
+    sandbox_unmount_dirs sandbox 2>err || atf_fail "Failed to unmount sandbox"
+    atf_check \
+        -o match:"umount failed" \
+        -o match:"sandbox/tmp.* has not disappeared yet; waiting" \
+        cat err
+
+    [ ! -e sandbox/tmp/foo ] || atf_fail "File systems seem to be left mounted"
+}
+unmount_dirs__busy_cleanup() {
+    [ ! -f busy.pid ] || kill -9 "$(cat busy.pid)" >/dev/null 2>&1
+    umount sandbox/tmp >/dev/null 2>&1 || true
+}
+
+
 atf_test_case unmount_dirs__slow cleanup
 unmount_dirs__slow_head() {
     atf_set "require.user" "root"
@@ -445,7 +485,10 @@ unmount_dirs__slow_body() {
     }
 
     sandbox_unmount_dirs sandbox 2>err || atf_fail "Failed to unmount sandbox"
-    atf_check -o match:"sandbox/tmp.* has not disappeared yet; waiting" cat err
+    atf_check \
+        -o match:"sandbox/tmp.* has not disappeared yet; waiting" \
+        -o not-match:"umount failed" \
+        cat err
 
     [ ! -e sandbox/tmp/foo ] || atf_fail "File systems seem to be left mounted"
 }
@@ -825,6 +868,7 @@ atf_init_test_cases() {
 
     atf_add_test_case unmount_dirs__ok
     atf_add_test_case unmount_dirs__ok_indirect
+    atf_add_test_case unmount_dirs__busy
     atf_add_test_case unmount_dirs__slow
     atf_add_test_case unmount_dirs__force
     atf_add_test_case unmount_dirs__error

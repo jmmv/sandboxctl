@@ -635,7 +635,7 @@ unmount__force_force_body() {
     ( cd sandbox/tmp && sleep 300 ) &  # Keep the mount point busy.
 
     atf_check -s exit:1 -o inline:"mock_unmount $(pwd)/sandbox\n" \
-        -e match:"Failed to unmount sandbox" \
+        -e match:"Failed to unmount .*sandbox" \
         sandboxctl -c custom.conf unmount
     [ -f sandbox/tmp/cookie ] || atf_fail "File systems prematurely unmounted"
 
