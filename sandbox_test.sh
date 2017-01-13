@@ -806,7 +806,6 @@ bindfs__mount_fails_head() {
 bindfs__mount_fails_body() {
     shtk_abort() { atf_skip "${@}"; }
 
-    mkdir real
     if ( sandbox_bindfs -o rw real sandbox/mnt 2>err ); then
         atf_fail "sandbox_bindfs did not raise an error"
     fi
