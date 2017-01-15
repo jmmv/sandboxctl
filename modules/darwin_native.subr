@@ -29,13 +29,37 @@
 # \file darwin_native.subr
 # Sandbox type to bind-mount a live macOS system.
 
+shtk_import bool
+shtk_import cli
+shtk_import config
 shtk_import sandbox
 
 # List of directories to bind-mount in read-only mode.
+#
+# For /Library, we have to make /Library/Caches writable so we cannot just mount
+# the whole hierarchy: OSXFUSE doesn't like nested mount points and our unmount
+# code doesn't like them either.  Be selective about what we mount.
 _DARWIN_NATIVE_BINDFS_MOUNTS="
-    Applications Library System
-    bin opt private sbin
+    Library/Extensions
+    Library/Frameworks
+    Library/Java
+    Library/Preferences
+    System
+    bin opt private/etc sbin
     usr/bin usr/include usr/lib usr/libexec usr/sbin usr/share"
+
+
+# Prints the configuration variables exposed by this sandbox type.
+darwin_native_config_vars() {
+    echo "DARWIN_NATIVE_WITH_XCODE"
+}
+
+
+# Sets defaults for the configuration variables used by this sandbox type.
+darwin_native_set_defaults() {
+    # Remember to update sandboxctl.conf(5) if you change any default values.
+    shtk_config_set DARWIN_NATIVE_WITH_XCODE false
+}
 
 
 # Sets up a macOS sandbox that uses bind mounts.
@@ -47,13 +71,32 @@ darwin_native_create() {
     for dir in ${_DARWIN_NATIVE_BINDFS_MOUNTS}; do
         mkdir -p "${root}/${dir}" || return
     done
-    mkdir "${root}/dev"
-    mkdir "${root}/home"
-    mkdir "${root}/tmp"
-    chmod 1777 "${root}/tmp"
-    for dir in etc var; do
-        ( cd "${root}" && ln -s "private/${dir}" "${dir}" )
+    for dir in \
+        Applications \
+        Library/Caches "${HOME}" dev home \
+        private/tmp private/var/folders private/var/root
+    do
+        mkdir -p "${root}/${dir}" || return
     done
+    chmod 1777 "${root}/Library/Caches"
+    chmod 1777 "${root}/private/tmp"
+    for dir in etc tmp var; do
+        ( cd "${root}" && ln -s "private/${dir}" "${dir}" ) || return
+    done
+
+    # Ideally we'd null-mount /Applications within the sandbox to get access to
+    # Xcode and any other applications installed in the host system.
+    # Unfortunately this is insufficient to make Xcode functional because the
+    # xcodebuild tool relies on the getattrlist(2) system call to determine
+    # which SDKs are installed, and neither OSXFUSE nor bindfs implement this
+    # system call.  To workaround this, special-case Xcode support by
+    # duplicating the whole tree within the sandbox.  Because this is costly, we
+    # allow the user to customize this behavior.  See:
+    # https://github.com/osxfuse/osxfuse/issues/352
+    if shtk_bool_check "$(shtk_config_get DARWIN_NATIVE_WITH_XCODE)"; then
+        shtk_cli_info "Copying Xcode into the sandbox; this may take a while"
+        ditto /Applications/Xcode.app "${root}/Applications/Xcode.app"
+    fi
 }
 
 

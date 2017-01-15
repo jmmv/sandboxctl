@@ -42,6 +42,7 @@ config__builtins_body() {
     isolate_module darwin_native
 
     cat >expout <<EOF
+DARWIN_NATIVE_WITH_XCODE = false
 SANDBOX_ROOT is undefined
 SANDBOX_TYPE = empty
 EOF
@@ -49,11 +50,11 @@ EOF
 }
 
 
-atf_test_case integration cleanup
-integration_head() {
+atf_test_case integration__basic cleanup
+integration__basic_head() {
     atf_set "require.user" "root"
 }
-integration_body() {
+integration__basic_body() {
     [ "$(uname -s)" = 'Darwin' ] || atf_skip "Requires a Darwin host"
 
     cat >custom.conf <<EOF
@@ -64,14 +65,20 @@ EOF
     atf_check -e not-match:' W: ' -e not-match:' E: ' \
         sandboxctl -c custom.conf create
 
+    [ ! -e sandbox/Applications/Xcode.app ] || atf_fail "Xcode was copied" \
+        "into the sandbox but we did not request it"
+
     # The commands invoked within the sandbox must check:
     # - Presence of binaries (obviously).
     # - Presence of configuration files.  Chowning a file ensures that, at
     #   least, the passwords database is present and valid.
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
-    atf_check -e ignore sandboxctl -c custom.conf run /bin/sh -c \
+    # - Writability of /tmp, which is usually a symlink.
+    # - Writability of /var (via getconf).
+    atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
-         && chown root /tmp/testfile'
+         && chown root /tmp/testfile \
+         && getconf DARWIN_USER_TEMP_DIR'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
@@ -84,8 +91,50 @@ integration_cleanup() {
 }
 
 
+atf_test_case integration__with_xcode cleanup
+integration__with_xcode_head() {
+    atf_set "require.files" "/Applications/Xcode.app"
+    atf_set "require.user" "root"
+    atf_set "timeout" "900"
+}
+integration__with_xcode_body() {
+    [ "$(uname -s)" = 'Darwin' ] || atf_skip "Requires a Darwin host"
+
+    cat >custom.conf <<EOF
+SANDBOX_ROOT="$(pwd)/sandbox"
+SANDBOX_TYPE="darwin-native"
+DARWIN_NATIVE_WITH_XCODE=true
+EOF
+
+    atf_check -e not-match:' W: ' -e not-match:' E: ' \
+        sandboxctl -c custom.conf create
+
+    cat >sandbox/tmp/hello.c <<EOF
+#include <stdio.h>
+int main(void) {
+    printf("Hello, Xcode!\n");
+    return 0;
+}
+EOF
+
+    atf_check -o match:'Hello, Xcode!' -e ignore \
+        sandboxctl -c custom.conf run /bin/sh -c \
+        'xcodebuild -license accept \
+         ; cc -o /tmp/hello /tmp/hello.c \
+         && /tmp/hello'
+    [ -x sandbox/tmp/hello ] || atf_fail 'Test binary not created as expected'
+
+    atf_check sandboxctl -c custom.conf destroy
+    rm custom.conf
+}
+integration_cleanup() {
+    [ ! -f custom.conf ] || sandboxctl -c custom.conf destroy || true
+}
+
+
 atf_init_test_cases() {
     atf_add_test_case config__builtins
 
-    atf_add_test_case integration
+    atf_add_test_case integration__basic
+    atf_add_test_case integration__with_xcode
 }
