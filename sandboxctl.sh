@@ -29,6 +29,7 @@
 # \file sandboxctl.sh
 # Manages sandboxes under various operating systems.
 
+shtk_import cleanup
 shtk_import cli
 shtk_import config
 shtk_import sandbox
@@ -216,6 +217,30 @@ sandboxctl_unmount() {
 }
 
 
+# Executes chroot to enter the sandbox.
+#
+# \param ... Additional arguments to chroot, if any.
+#
+# \return The exit status of the executed command.
+_sandboxctl_chroot() {
+    _SANDBOXCTL_DID_UNMOUNT=false
+    unmount_on_signal() {
+        if [ "${_SANDBOXCTL_DID_UNMOUNT}" = false ]; then
+            sandboxctl_unmount
+            _SANDBOXCTL_DID_UNMOUNT=true
+        fi
+    }
+    shtk_cleanup_register unmount_on_signal
+
+    sandboxctl_mount
+    local ret=0
+    SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
+    sandboxctl_unmount
+    _SANDBOXCTL_DID_UNMOUNT=true
+    return "${ret}"
+}
+
+
 # Runs the given command inside the sandbox.
 #
 # \param binary Path to the binary to run, relative to the sandbox.
@@ -225,11 +250,7 @@ sandboxctl_unmount() {
 sandboxctl_run() {
     [ ${#} -gt 0 ] || shtk_cli_usage_error "run requires at least one argument"
 
-    sandboxctl_mount
-    local ret=0
-    SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
-    sandboxctl_unmount
-    return "${ret}"
+    _sandboxctl_chroot "${@}"
 }
 
 
@@ -239,12 +260,7 @@ sandboxctl_run() {
 sandboxctl_shell() {
     [ ${#} -eq 0 ] || shtk_cli_usage_error "shell does not take any arguments"
 
-    sandboxctl_mount
-    local ret=0
-    PS1="sandbox# " SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" \
-        || ret="${?}"
-    sandboxctl_unmount
-    return "${ret}"
+    PS1="sandbox# " _sandboxctl_chroot
 }
 
 

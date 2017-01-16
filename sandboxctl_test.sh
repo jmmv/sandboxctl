@@ -799,6 +799,49 @@ run__validate_config_body() {
 }
 
 
+atf_test_case run__unmount_after_signals
+run__unmount_after_signals_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+    cat >sandbox/wait.sh <<EOF
+#! /bin/sh
+echo "Waiting for signal"
+touch cookie
+while [ -e cookie ]; do
+    sleep .1
+done
+EOF
+    chmod +x sandbox/wait.sh
+
+    for signal in HUP INT TERM; do
+        rm -f sandbox/cookie out err
+
+        echo "Testing handling of ${signal} signal"
+        sandboxctl -c custom.conf run ./wait.sh >out 2>err &
+        local pid="${!}"
+
+        while [ ! -e sandbox/cookie ]; do
+            echo "sandbox/cookie not found; waiting for sandbox to come up"
+            sleep .1
+        done
+
+        echo "Sending ${signal} to sandboxctl PID ${pid}"
+        kill "-${signal}" "${pid}"
+        rm sandbox/cookie
+        wait "${pid}"
+
+        cat >expout <<EOF
+mock_mount $(pwd)/sandbox
+Waiting for signal
+mock_unmount $(pwd)/sandbox
+EOF
+        atf_check -o file:expout cat out
+    done
+}
+
+
 atf_test_case shell__ok
 shell__ok_body() {
     create_config_with_mock_type custom.conf "$(pwd)/sandbox"
@@ -854,6 +897,42 @@ EOF
 atf_test_case shell__validate_config
 shell__validate_config_body() {
     test_validate_config shell
+}
+
+
+atf_test_case shell__unmount_after_signals
+shell__unmount_after_signals_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+
+    for signal in HUP INT TERM; do
+        rm -f sandbox/cookie out err
+
+        echo "Testing handling of ${signal} signal"
+        echo 'echo "Waiting for signal"; touch cookie;' \
+             'while [ -e cookie ]; do sleep .1; done' \
+            | sandboxctl -c custom.conf shell >out 2>err &
+        local pid="${!}"
+
+        while [ ! -e sandbox/cookie ]; do
+            echo "sandbox/cookie not found; waiting for sandbox to come up"
+            sleep .1
+        done
+
+        echo "Sending ${signal} to sandboxctl PID ${pid}"
+        kill "-${signal}" "${pid}"
+        rm sandbox/cookie
+        wait "${pid}"
+
+        cat >expout <<EOF
+mock_mount $(pwd)/sandbox
+Waiting for signal
+mock_unmount $(pwd)/sandbox
+EOF
+        atf_check -o file:expout cat out
+    done
 }
 
 
@@ -938,11 +1017,13 @@ atf_init_test_cases() {
     atf_add_test_case run__shell_is_sh
     atf_add_test_case run__command_fails
     atf_add_test_case run__validate_config
+    atf_add_test_case run__unmount_after_signals
 
     atf_add_test_case shell__ok
     atf_add_test_case shell__shell_is_sh
     atf_add_test_case shell__fail
     atf_add_test_case shell__validate_config
+    atf_add_test_case shell__unmount_after_signals
 
     atf_add_test_case no_command
     atf_add_test_case unknown_command
