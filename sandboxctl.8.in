@@ -25,7 +25,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd October 21, 2016
+.Dd January 19, 2017
 .Dt SANDBOXCTL 8
 .Os
 .Sh NAME
@@ -37,6 +37,7 @@
 .Op Fl o Ar variable=value
 .Op Fl v
 config
+.Op Ar variable
 .Nm
 .Op Fl c Ar config_name
 .Op Fl o Ar variable=value
@@ -207,6 +208,12 @@ The format of the output is not a script, so it cannot be fed back into
 The purpose of this command is to aid in debugging the configuration of the
 tool, particularly for those configuration files that use shell logic to
 determine the value of the variables they define.
+.Pp
+A single
+.Ar variable
+name can be provided as an argument to this command, in which case the value
+of this variable is printed verbatim to the standard output.
+It is an error if the given variable is not defined.
 .Pp
 Note that the output of this command varies across operating systems depending
 on the sandbox types available.

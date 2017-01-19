@@ -70,19 +70,29 @@ sandboxctl_set_defaults() {
 #
 # \param ... The options and arguments to the command.
 sandboxctl_config() {
-    [ ${#} -eq 0 ] || shtk_cli_usage_error "config does not take any arguments"
+    [ ${#} -le 1 ] || shtk_cli_usage_error "config takes at most one argument"
 
-    local all_vars="${SANDBOXCTL_CONFIG_VARS} $(sandbox_call_types config_vars)"
-    local sorted_vars="$(for var in ${all_vars}; do \
-                             echo "${var}"; \
-                         done | sort | uniq)"
-    for var in ${sorted_vars}; do
-        if shtk_config_has "${var}"; then
-            echo "${var} = $(shtk_config_get "${var}")"
-        else
-            echo "${var} is undefined"
+    if [ ${#} -eq 0 ]; then
+        local all_vars="${SANDBOXCTL_CONFIG_VARS} $(sandbox_call_types \
+                            config_vars)"
+        local sorted_vars="$(for var in ${all_vars}; do \
+                                 echo "${var}"; \
+                             done | sort | uniq)"
+        for var in ${sorted_vars}; do
+            if shtk_config_has "${var}"; then
+                echo "${var} = $(shtk_config_get "${var}")"
+            else
+                echo "${var} is undefined"
+            fi
+        done
+    else
+        local var="${1}"; shift
+
+        if ! shtk_config_has "${var}"; then
+            shtk_cli_error "${var} is not defined"
         fi
-    done
+        echo "$(shtk_config_get "${var}")"
+    fi
 }
 
 

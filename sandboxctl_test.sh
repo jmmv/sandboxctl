@@ -212,13 +212,32 @@ EOF
 }
 
 
+atf_test_case config__one_variable
+config__one_variable_body() {
+    create_config_with_mock_type unused.conf unused-directory
+    cat >expout <<EOF
+MOCK_VARIABLE = mock-value
+SANDBOX_ROOT is undefined
+SANDBOX_TYPE = empty
+EOF
+    atf_check -o inline:'mock-value\n' \
+        sandboxctl -c /dev/null config MOCK_VARIABLE
+    atf_check -s exit:1 -e match:'SANDBOX_ROOT is not defined' \
+        sandboxctl -c /dev/null config SANDBOX_ROOT
+    atf_check -o inline:'empty\n' \
+        sandboxctl -c /dev/null config SANDBOX_TYPE
+    atf_check -s exit:1 -e match:'unknown_variable is not defined' \
+        sandboxctl -c /dev/null config unknown_variable
+}
+
+
 atf_test_case config__too_many_args
 config__too_many_args_body() {
     cat >experr <<EOF
-sandboxctl: E: config does not take any arguments
+sandboxctl: E: config takes at most one argument
 Type 'man sandboxctl' for help
 EOF
-    atf_check -s exit:1 -e file:experr sandboxctl -c /dev/null config foo
+    atf_check -s exit:1 -e file:experr sandboxctl -c /dev/null config foo bar
 }
 
 
@@ -974,6 +993,7 @@ atf_init_test_cases() {
     atf_add_test_case config__name__system_directory
     atf_add_test_case config__name__not_found
     atf_add_test_case config__overrides
+    atf_add_test_case config__one_variable
     atf_add_test_case config__too_many_args
 
     atf_add_test_case create__ok
