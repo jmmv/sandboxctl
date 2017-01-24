@@ -723,7 +723,7 @@ unmount__unknown_flag_body() {
 sandboxctl: E: Unknown option -k in unmount
 Type 'man sandboxctl' for help
 EOF
-    atf_check -s exit:1 -e file:experr sandboxctl unmount -k
+    atf_check -s exit:1 -e file:experr sandboxctl -c /dev/null unmount -k
 }
 
 
