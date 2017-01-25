@@ -572,15 +572,29 @@ destroy__ok_body() {
 
 atf_test_case destroy__protected_files cleanup
 destroy__protected_files_head() {
-    atf_set "require.progs" "chflags"
+    case "$(uname -s)" in
+        Linux)
+            atf_set "require.progs" "chattr"
+            ;;
+        *)
+            atf_set "require.progs" "chflags"
+            ;;
+    esac
     atf_set "require.user" "root"
 }
 destroy__protected_files_body() {
     mkdir -p sandbox/tmp
     touch sandbox/tmp/foo
-    chflags schg sandbox/tmp/foo
     touch sandbox/tmp/bar
-    chflags uchg sandbox/tmp/bar
+    case "$(uname -s)" in
+        Linux)
+            chattr +i sandbox/tmp/foo sandbox/tmp/bar
+            ;;
+        *)
+            chflags schg sandbox/tmp/foo
+            chflags uchg sandbox/tmp/bar
+            ;;
+    esac
 
     sandbox_destroy sandbox || atf_fail "sandbox_destroy failed"
     [ ! -d sandbox ] || atf_fail "sandbox not deleted"

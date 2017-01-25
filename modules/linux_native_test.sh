@@ -1,5 +1,5 @@
 #! __ATF_SH__
-# Copyright 2013 Google Inc.
+# Copyright 2017 Google Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,8 +27,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# \file netbsd_native_test.sh
-# Integration tests for the netbsd_native sandbox type.
+# \file linux_native_test.sh
+# Integration tests for the linux_native sandbox type.
 
 
 # Paths to installed files.
@@ -39,10 +39,9 @@
 
 atf_test_case config__builtins
 config__builtins_body() {
-    isolate_module netbsd_native
+    isolate_module linux_native
 
     cat >expout <<EOF
-NETBSD_NATIVE_RELEASEDIR = /home/sysbuild/release/$(uname -m)
 SANDBOX_ROOT is undefined
 SANDBOX_TYPE = empty
 EOF
@@ -52,17 +51,14 @@ EOF
 
 atf_test_case integration cleanup
 integration_head() {
-    atf_set "require.config" "netbsd_releasedir"
     atf_set "require.user" "root"
 }
 integration_body() {
-    [ "$(uname -s)" = 'NetBSD' ] || atf_skip "Requires a NetBSD host"
+    [ "$(uname -s)" = 'Linux' ] || atf_skip "Requires a Linux host"
 
     cat >custom.conf <<EOF
 SANDBOX_ROOT="$(pwd)/sandbox"
-SANDBOX_TYPE="netbsd-native"
-
-NETBSD_NATIVE_RELEASEDIR="$(atf_config_get netbsd_releasedir)"
+SANDBOX_TYPE="linux-native"
 EOF
 
     atf_check -e not-match:' W: ' -e not-match:' E: ' \

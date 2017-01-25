@@ -73,13 +73,16 @@ EOF
     # - Presence of configuration files.  Chowning a file ensures that, at
     #   least, the passwords database is present and valid.
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
+    # - Invocation of su, to potentially trigger a write to /var.
     # - Writability of /tmp, which is usually a symlink.
     # - Writability of /var (via getconf).
     atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
+         && su root /bin/sh -c "touch /tmp/sufile" \
          && getconf DARWIN_USER_TEMP_DIR'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
+    [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
 

@@ -8,6 +8,9 @@ end
 if fs.exists("freebsd_native_test") then
    atf_test_program{name="freebsd_native_test"}
 end
+if fs.exists("linux_native_test") then
+   atf_test_program{name="linux_native_test"}
+end
 if fs.exists("netbsd_native_test") then
    atf_test_program{name="netbsd_native_test"}
 end

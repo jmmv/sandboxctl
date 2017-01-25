@@ -25,7 +25,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd January 15, 2017
+.Dd January 24, 2017
 .Dt SANDBOXCTL.CONF 5
 .Os
 .Sh NAME
@@ -123,6 +123,18 @@ host.
 Default:
 .Pa /usr/src
 .El
+@endif
+@if Linux
+.Ss Configuration variables for the linux-native sandbox type
+The
+.Sq linux-native
+sandbox type sets up a
+.Fx
+sandbox on a
+.Fx
+host and replicates the host system under the sandbox using null mounts.
+Sandboxes created using this type mimic the host system and are fast to create
+and destroy.
 @endif
 @if NetBSD
 .Ss Configuration variables for the netbsd-native sandbox type

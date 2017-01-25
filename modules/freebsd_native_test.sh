@@ -69,6 +69,7 @@ EOF
     # - Presence and writability of configuration files.  Adding a test user
     #   ensures that, at least, the passwords database is present and valid.
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
+    # - Invocation of su, to potentially trigger a write to /var.
     # - Ability to update the passwords database, which indirectly means a
     #   writable /etc.
     # - Configuration of /bin/sh as the default shell.
@@ -79,6 +80,7 @@ fail() { echo "\${@}" 1>&2; exit 1; }
 
 pw useradd -n testuser -s /bin/sh -m -w no || fail "User addition failed"
 dd if=/dev/zero of=/tmp/testfile bs=1k count=1 || fail "Devices failed"
+su root /bin/sh -c "touch /tmp/sufile"' || fail "su failed"
 
 [ "\${SHELL}" = /bin/sh ] || fail "SHELL is \${SHELL} but should be /bin/sh"
 EOF
@@ -92,6 +94,7 @@ EOF
     grep "^testuser" sandbox/etc/passwd \
         || atf_fail 'passwd was not correctly updated'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
+    [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
 

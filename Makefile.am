@@ -66,6 +66,11 @@ dist_pkgdata_DATA += modules/freebsd_native.subr
 else
 EXTRA_DIST += modules/freebsd_native.subr
 endif
+if SANDBOXCTL_OS_LINUX
+dist_pkgdata_DATA += modules/linux_native.subr
+else
+EXTRA_DIST += modules/linux_native.subr
+endif
 if SANDBOXCTL_OS_NETBSD
 dist_pkgdata_DATA += modules/netbsd_native.subr
 dist_pkgdata_DATA += modules/netbsd_release.subr
@@ -78,6 +83,7 @@ nodist_sandboxctl_conf_DATA = default.conf
 CLEANFILES = default.conf
 EXTRA_DIST += examples/Darwin.conf
 EXTRA_DIST += examples/FreeBSD.conf
+EXTRA_DIST += examples/Linux.conf
 EXTRA_DIST += examples/NetBSD.conf
 default.conf: $(srcdir)/examples/$(SANDBOXCTL_OS).conf
 	$(AM_V_GEN)cp $(srcdir)/examples/$(SANDBOXCTL_OS).conf default.conf
@@ -152,6 +158,17 @@ modules/freebsd_native_test: $(srcdir)/modules/freebsd_native_test.sh \
 	test -d modules || mkdir -p modules
 	sources="$(srcdir)/modules/freebsd_native_test.sh $(srcdir)/test_utils.sh" \
 	target=modules/freebsd_native_test; $(BUILD_TEST)
+endif
+
+EXTRA_DIST += modules/linux_native_test.sh
+if SANDBOXCTL_OS_LINUX
+modulestests_SCRIPTS += modules/linux_native_test
+CLEANFILES += modules/linux_native_test
+modules/linux_native_test: $(srcdir)/modules/linux_native_test.sh \
+                           $(srcdir)/test_utils.sh
+	test -d modules || mkdir -p modules
+	sources="$(srcdir)/modules/linux_native_test.sh $(srcdir)/test_utils.sh" \
+	target=modules/linux_native_test; $(BUILD_TEST)
 endif
 
 EXTRA_DIST += modules/netbsd_native_test.sh

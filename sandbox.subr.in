@@ -302,6 +302,9 @@ sandbox_destroy() {
         Darwin|FreeBSD|NetBSD)
             chflags -R noschg,nouchg "${real_root}" 2>/dev/null || true
             ;;
+        Linux)
+            chattr -R -i "${real_root}" 2>/dev/null || true
+            ;;
     esac
     chmod -R u+rwx "${real_root}" 2>/dev/null || true
 
@@ -312,6 +315,15 @@ sandbox_destroy() {
             # "leak" outside of the sandbox, especially during the
             # development of sandboxctl.
             rm -xrf "${real_root}" || shtk_cli_error "Failed to destroy ${root}"
+            ;;
+
+        Linux)
+            # Be extra paranoid: use GNU's --one-file-system flag to avoid
+            # crossing mount points.  We don't want the remove operation to
+            # "leak" outside of the sandbox, especially during the development
+            # of sandboxctl.
+            rm -rf --one-file-system "${real_root}" \
+                || shtk_cli_error "Failed to destroy ${root}"
             ;;
 
         *)
@@ -421,6 +433,15 @@ sandbox_bindfs() {
         FreeBSD)
             mount -t nullfs -o "${mode}" "${source}" "${mount_point}" \
                 || shtk_cli_error "Failed to bind ${mount_point}"
+            ;;
+
+        Linux)
+            mount --bind "${source}" "${mount_point}" \
+                || shtk_cli_error "Failed to bind ${mount_point}"
+            if [ "${mode}" != rw ]; then
+                mount -o "bind,remount,${mode}" "${mount_point}" \
+                    || shtk_cli_error "Failed to bind ${mount_point}"
+            fi
             ;;
 
         NetBSD)

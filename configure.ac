@@ -45,7 +45,7 @@ AC_MSG_CHECKING([for operating system name])
 osname="$(uname -s)"
 AC_MSG_RESULT([${osname}])
 case "${osname}" in
-    Darwin|FreeBSD|NetBSD)
+    Darwin|FreeBSD|Linux|NetBSD)
         ;;
     *)
         AC_MSG_ERROR([Operating system ${osname} is not supported])
@@ -53,6 +53,7 @@ case "${osname}" in
 esac
 AM_CONDITIONAL([SANDBOXCTL_OS_DARWIN], [test "${osname}" = Darwin])
 AM_CONDITIONAL([SANDBOXCTL_OS_FREEBSD], [test "${osname}" = FreeBSD])
+AM_CONDITIONAL([SANDBOXCTL_OS_LINUX], [test "${osname}" = Linux])
 AM_CONDITIONAL([SANDBOXCTL_OS_NETBSD], [test "${osname}" = NetBSD])
 AC_SUBST([SANDBOXCTL_OS], [${osname}])
 

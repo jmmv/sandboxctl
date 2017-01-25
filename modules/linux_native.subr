@@ -1,0 +1,86 @@
+# Copyright 2017 Google Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in the
+#   documentation and/or other materials provided with the distribution.
+# * Neither the name of Google Inc. nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# \file linux_native.subr
+# Sandbox type to null-mount a live Linux system.
+#
+# This sandbox type is pretty permissive in the file system layout to try
+# to support a wide variety of Linux distributions.
+
+shtk_import cli
+shtk_import sandbox
+
+# List of directories to null-mount in read-only mode.
+#
+# Only the directories that exist will be remounted, so this list tries
+# to cover multiple potential file system layouts.
+_LINUX_NATIVE_BINDFS_MOUNTS="
+    bin boot dev lib lib32 lib64 libdata libexec proc run sbin sys
+    usr/bin usr/include usr/lib usr/lib32 usr/lib64 usr/libdata usr/libexec
+    usr/sbin usr/share"
+
+
+# Sets up a Linux sandbox that uses null mounts.
+#
+# \param root Path to the sandbox directory.
+linux_native_create() {
+    local root="${1}"; shift
+
+    for dir in ${_LINUX_NATIVE_BINDFS_MOUNTS}; do
+        if [ -e "/${dir}" ]; then
+            mkdir -p "${root}/${dir}" || return
+        fi
+    done
+
+    mkdir "${root}/tmp"
+    chmod 1777 "${root}/tmp"
+
+    for dir in etc root; do
+        shtk_cli_debug "Copying ${dir} into the sandbox"
+        mkdir "${root}/${dir}"
+        tar -c -C "/${dir}" -f - . | tar -xp -C "${root}/${dir}" -f - || return
+    done
+
+    shtk_cli_debug "Replicating /var layout within the sandbox"
+    mkdir "${root}/var"
+    find /var -type d -exec mkdir -p "${root}{}" \; || return
+}
+
+
+# Enters a Linux sandbox that uses null mounts.
+#
+# \param root Path to the sandbox directory.
+linux_native_mount() {
+    local root="${1}"; shift
+
+    for dir in ${_LINUX_NATIVE_BINDFS_MOUNTS}; do
+        if [ -e "/${dir}" ]; then
+            sandbox_bindfs "/${dir}" "${root}/${dir}" || return
+        fi
+    done
+}
