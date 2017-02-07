@@ -430,6 +430,30 @@ unmount_dirs__ok_indirect_cleanup() {
 }
 
 
+atf_test_case unmount_dirs__ok_respect_spaces cleanup
+unmount_dirs__ok_respect_spaces_head() {
+    atf_set "require.user" "root"
+}
+unmount_dirs__ok_respect_spaces_body() {
+    for dir in 'sandbox/fi rst/dir' 'sandbox/se cond/nested/dir'; do
+        echo "${dir}" >>dirs
+        mkdir -p "${dir}"
+        mount_tmpfs "${dir}"
+        touch "${dir}/cookie"
+    done
+
+    sandbox_unmount_dirs sandbox || atf_fail "Failed to unmount sandbox"
+    if [ -n "$(find sandbox -name cookie)" ]; then
+        atf_fail "File systems seem to be left mounted"
+    fi
+}
+unmount_dirs__ok_respect_spaces_cleanup() {
+    cat dirs | while read dir; do
+        umount "${dir}" >/dev/null 2>&1 || true
+    done
+}
+
+
 atf_test_case unmount_dirs__busy cleanup
 unmount_dirs__busy_head() {
     atf_set "require.user" "root"
@@ -881,6 +905,7 @@ atf_init_test_cases() {
 
     atf_add_test_case unmount_dirs__ok
     atf_add_test_case unmount_dirs__ok_indirect
+    atf_add_test_case unmount_dirs__ok_respect_spaces
     atf_add_test_case unmount_dirs__busy
     atf_add_test_case unmount_dirs__slow
     atf_add_test_case unmount_dirs__force

@@ -249,10 +249,14 @@ sandbox_unmount_dirs() {
 
     local root="${1}"; shift
 
+    # To get the list of directories, we have to scan the output of mount, line
+    # by line, and take out the parts we know are not part of the directory.
+    # This is so that we respect spaces in mount points.  Fragile, indeed, but
+    # we have no better mechanism from here.
     local real_root="$(cd "${root}" && pwd -P)"
     LANG=C LC_ALL=C mount \
-        | grep -Eo " on ${real_root}/[^ ]+" \
-        | cut -d ' ' -f 3- \
+        | sed -e 's,^.* on ,,;s, ([^)]*)$,,;s, type .*$,,' \
+        | grep -E "^${real_root}/.+" \
         | while read dir
     do
         shtk_cli_debug "Unmounting ${dir}"
