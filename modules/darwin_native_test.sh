@@ -79,7 +79,7 @@ EOF
     atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
-         && su root /bin/sh -c "touch /tmp/sufile" \
+         && su root -c "touch /tmp/sufile" \
          && getconf DARWIN_USER_TEMP_DIR'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
