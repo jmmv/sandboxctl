@@ -34,19 +34,30 @@ shtk_import cli
 shtk_import config
 shtk_import sandbox
 
-# List of directories to bind-mount in read-only mode.
+
+# Lists the directories to bind-mount in read-only mode.
 #
-# For /Library, we have to make /Library/Caches writable so we cannot just mount
-# the whole hierarchy: OSXFUSE doesn't like nested mount points and our unmount
-# code doesn't like them either.  Be selective about what we mount.
-_DARWIN_NATIVE_BINDFS_MOUNTS="
-    Library/Extensions
-    Library/Frameworks
-    Library/Java
-    Library/Preferences
-    System
-    bin opt private/etc sbin
-    usr/bin usr/include usr/lib usr/libexec usr/sbin usr/share"
+# This prints one path per directory, without the leading slash.  Each line may
+# include spaces, so the caller must be careful to respect those.
+_darwin_native_bindfs_mounts() {
+    for dir in System \
+               bin opt private/etc sbin \
+               usr/bin usr/include usr/lib usr/libexec usr/sbin usr/share
+    do
+        echo "${dir}"
+    done
+
+    # For /Library, we have to make /Library/Caches writable so we cannot just
+    # mount the whole hierarchy: OSXFUSE doesn't like nested mount points and
+    # our unmount code doesn't like them either.
+    find /Library -type d -mindepth 1 -maxdepth 1 | cut -d / -f 3- | \
+        while read dir; do
+            case "${dir}" in
+                Caches) ;;
+                *) echo "Library/${dir}" ;;
+            esac
+        done
+}
 
 
 # Prints the configuration variables exposed by this sandbox type.
@@ -68,9 +79,10 @@ darwin_native_set_defaults() {
 darwin_native_create() {
     local root="${1}"; shift
 
-    for dir in ${_DARWIN_NATIVE_BINDFS_MOUNTS}; do
-        mkdir -p "${root}/${dir}" || return
-    done
+    _darwin_native_bindfs_mounts | \
+        while read dir; do
+            mkdir -p "${root}/${dir}" || return
+        done
     for dir in \
         Applications \
         Library/Caches "${HOME}" dev home \
@@ -106,10 +118,11 @@ darwin_native_create() {
 darwin_native_mount() {
     local root="${1}"; shift
 
-    for dir in ${_DARWIN_NATIVE_BINDFS_MOUNTS}; do
-        [ -d "/${dir}" ] || continue
-        sandbox_bindfs "/${dir}" "${root}/${dir}"
-    done
+    _darwin_native_bindfs_mounts | \
+        while read dir; do
+            [ -d "/${dir}" ] || continue
+            sandbox_bindfs "/${dir}" "${root}/${dir}"
+        done
 
     mount -t devfs devfs "${root}/dev"
 }
