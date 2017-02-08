@@ -62,8 +62,11 @@ SANDBOX_ROOT="$(pwd)/sandbox"
 SANDBOX_TYPE="darwin-native"
 EOF
 
+    # Force HOME to be under /var to ensure that the directory is created only
+    # after /var has been established as a symlink; otherwise /var becomes a
+    # real directory, which can later confuse getconf (tested below).
     atf_check -e not-match:' W: ' -e not-match:' E: ' \
-        sandboxctl -c custom.conf create
+        env HOME=/var/something sandboxctl -c custom.conf create
 
     [ ! -e sandbox/Applications/Xcode.app ] || atf_fail "Xcode was copied" \
         "into the sandbox but we did not request it"
@@ -79,10 +82,13 @@ EOF
     atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
+         && getconf DARWIN_USER_TEMP_DIR >/tmp/getconf \
          && su root -c "touch /tmp/sufile" \
-         && getconf DARWIN_USER_TEMP_DIR'
+         && cp /etc/resolv.conf /tmp/resolv.conf'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
+    [ -s sandbox/tmp/getconf ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
+    [ -s sandbox/tmp/resolv.conf ] || atf_fail 'resolv.conf is bogus'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
 

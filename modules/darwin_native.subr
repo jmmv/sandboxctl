@@ -41,7 +41,7 @@ shtk_import sandbox
 # include spaces, so the caller must be careful to respect those.
 _darwin_native_bindfs_mounts() {
     for dir in System \
-               bin opt private/etc sbin \
+               bin opt/X11 private/etc sbin \
                usr/bin usr/include usr/lib usr/libexec usr/sbin usr/share
     do
         echo "${dir}"
@@ -143,16 +143,20 @@ darwin_native_create() {
         done
     for dir in \
         Applications \
-        Library/Caches "${HOME}" dev home \
-        private/tmp private/var/folders private/var/root
+        Library/Caches dev home \
+        private/tmp private/var/folders private/var/tmp private/var/root \
+        private/var/run
     do
         mkdir -p "${root}/${dir}" || return
     done
     chmod 1777 "${root}/Library/Caches"
     chmod 1777 "${root}/private/tmp"
+    chmod 1777 "${root}/private/var/tmp"
     for dir in etc tmp var; do
         ( cd "${root}" && ln -s "private/${dir}" "${dir}" ) || return
     done
+    # Must come last to prevent creating var until it's a symlink.
+    mkdir -p "${root}/${HOME}" || return
 
     # Ideally we'd null-mount /Applications within the sandbox to get access to
     # Xcode and any other applications installed in the host system.
@@ -181,6 +185,8 @@ darwin_native_mount() {
             [ -d "/${dir}" ] || continue
             sandbox_bindfs "/${dir}" "${root}/${dir}"
         done
+
+    cp /var/run/resolv.conf "${root}/var/run"
 
     mount -t devfs devfs "${root}/dev"
 }
