@@ -50,10 +50,68 @@ _darwin_native_bindfs_mounts() {
     # For /Library, we have to make /Library/Caches writable so we cannot just
     # mount the whole hierarchy: OSXFUSE doesn't like nested mount points and
     # our unmount code doesn't like them either.
+    #
+    # Instead, we iterate over all possible directories in /Library and mount
+    # them individually.  We must do it this way, instead of just mounting a
+    # set of known directories, because the system might have been configured
+    # to use files in subdirectories we don't expect (e.g. PAM could be
+    # pointing at a module in a company-specific subdirectory, and then things
+    # wouldn't work properly within the sandbox).  Unfortunately, OSXFUSE is
+    # slow and doesn't like too many mount points, so we have to blacklist
+    # many of the known subdirectories we won't really need.
     find /Library -type d -mindepth 1 -maxdepth 1 | cut -d / -f 3- | \
         while read dir; do
             case "${dir}" in
+                Audio) ;;
                 Caches) ;;
+                ColorPickers) ;;
+                ColorSync) ;;
+                Components) ;;
+                Compositions) ;;
+                Contextual\ Menu\ Items) ;;
+                CoreMediaIO) ;;
+                Desktop\ Pictures) ;;
+                DirectoryServices) ;;
+                Documentation) ;;
+                DropboxHelperTools) ;;
+                Fonts) ;;
+                Google) ;;
+                Graphics) ;;
+                Image\ Capture) ;;
+                Input\ Methods) ;;
+                Internet\ Plug-Ins) ;;
+                Keyboard\ Layouts) ;;
+                Keychains) ;;
+                LaunchAgents) ;;
+                LaunchDaemons) ;;
+                Logs) ;;
+                Managed\ Preferences) ;;
+                Messages) ;;
+                Modem\ Scripts) ;;
+                OpenDirectory) ;;
+                PDF\ Services) ;;
+                PreferencePanes) ;;
+                Printers) ;;
+                PrivilegedHelperTools) ;;
+                QuickLook) ;;
+                QuickTime) ;;
+                Raft) ;;
+                Receipts) ;;
+                Sandbox) ;;
+                Screen\ Savers) ;;
+                ScriptingAdditions) ;;
+                Scripts) ;;
+                Security) ;;
+                Speech) ;;
+                Spotlight) ;;
+                StartupItems) ;;
+                SystemMigration) ;;
+                SystemProfiler) ;;
+                Updates) ;;
+                User\ Pictures) ;;
+                Video) ;;
+                WebServer) ;;
+                Widgets) ;;
                 *) echo "Library/${dir}" ;;
             esac
         done
