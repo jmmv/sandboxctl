@@ -244,7 +244,8 @@ _sandboxctl_chroot() {
 
     sandboxctl_mount
     local ret=0
-    SHELL=/bin/sh chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
+    SHELL=/bin/sh TMPDIR=/tmp \
+        chroot "$(shtk_config_get SANDBOX_ROOT)" "${@}" || ret="${?}"
     sandboxctl_unmount
     _SANDBOXCTL_DID_UNMOUNT=true
     return "${ret}"
