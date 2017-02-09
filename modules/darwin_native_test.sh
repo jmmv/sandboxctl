@@ -79,18 +79,22 @@ EOF
     # - Invocation of su, to potentially trigger a write to /var.
     # - Writability of /tmp, which is usually a symlink.
     # - Writability of /var (via getconf).
+    # - Name resolution works with mDNSResponder (via curl).
     atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
          && getconf DARWIN_USER_TEMP_DIR >/tmp/getconf \
          && su root -c "touch /tmp/sufile" \
-         && cp /etc/resolv.conf /tmp/resolv.conf'
+         && cp /etc/resolv.conf /tmp/resolv.conf \
+         && curl example.com >tmp/example.html'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     [ -s sandbox/tmp/getconf ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
     [ -s sandbox/tmp/resolv.conf ] || atf_fail 'resolv.conf is bogus'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
+    grep -i '<html' sandbox/tmp/example.html >/dev/null \
+        || atf_fail 'Invalid response from example.com; bad DNS configuration?'
 
     atf_check sandboxctl -c custom.conf destroy
     rm custom.conf
