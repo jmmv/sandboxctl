@@ -68,7 +68,8 @@ linux_native_create() {
 
     shtk_cli_debug "Replicating /var layout within the sandbox"
     mkdir "${root}/var"
-    find /var -type d -exec mkdir -p "${root}{}" \; || return
+    find /var -path "${root}" -prune -o -type d -exec mkdir -p "${root}{}" \; \
+        || return
 }
 
 
