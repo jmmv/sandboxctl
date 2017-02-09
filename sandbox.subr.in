@@ -231,12 +231,15 @@ sandbox_has_mounts() {
 #
 # \param root Path to the sandbox root.
 sandbox_unmount_dirs() {
-    local force_flag=
+    local force_flags=
     local OPTIND
     while getopts ':f' arg "${@}"; do
         case "${arg}" in
             f)  # Force-unmount file systems.
-                force_flag=-f
+                case "$(uname -s)" in
+                    Linux) force_flags="-f -l" ;;
+                    *) force_flags=-f ;;
+                esac
                 ;;
 
             \?)
@@ -265,7 +268,7 @@ sandbox_unmount_dirs() {
             # This may fail e.g. if the file system is busy.  We don't check for
             # error here because we want to retry this a few times.  We will
             # only determine that the unmount failed if we run out of tries.
-            umount ${force_flag} "${dir}" || shtk_cli_debug "umount failed"
+            umount ${force_flags} "${dir}" || shtk_cli_debug "umount failed"
             sandbox_has_mounts "${dir}" || break
 
             shtk_cli_debug "Mount point ${dir} has not disappeared yet; waiting"
