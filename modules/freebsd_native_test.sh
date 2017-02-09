@@ -73,6 +73,7 @@ EOF
     # - Ability to update the passwords database, which indirectly means a
     #   writable /etc.
     # - Configuration of /bin/sh as the default shell.
+    # - Name resolution works (via fetch).
     cat >sandbox/tmp/checks.sh <<EOF
 #! /bin/sh
 
@@ -80,7 +81,8 @@ fail() { echo "\${@}" 1>&2; exit 1; }
 
 pw useradd -n testuser -s /bin/sh -m -w no || fail "User addition failed"
 dd if=/dev/zero of=/tmp/testfile bs=1k count=1 || fail "Devices failed"
-su root /bin/sh -c "touch /tmp/sufile"' || fail "su failed"
+su root -c "touch /tmp/sufile" || fail "su failed"
+fetch -o /tmp/example.html http://example.com/
 
 [ "\${SHELL}" = /bin/sh ] || fail "SHELL is \${SHELL} but should be /bin/sh"
 EOF
@@ -97,6 +99,8 @@ EOF
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
+    grep -i '<html' sandbox/tmp/example.html >/dev/null \
+        || atf_fail 'Invalid response from example.com; bad DNS configuration?'
 
     atf_check sandboxctl -c custom.conf destroy
     rm custom.conf

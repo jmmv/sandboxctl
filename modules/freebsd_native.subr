@@ -90,6 +90,8 @@ freebsd_native_create() {
 freebsd_native_mount() {
     local root="${1}"; shift
 
+    cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
+
     for dir in ${_FREEBSD_NATIVE_BINDFS_MOUNTS}; do
         sandbox_bindfs "/${dir}" "${root}/${dir}"
     done

@@ -74,14 +74,18 @@ EOF
     #   least, the passwords database is present and valid.
     # - Invocation of MAKEDEV.  Using a device from /dev/ should be enough.
     # - Invocation of su, to potentially trigger a write to /var.
+    # - Name resolution works (via ftp).
     atf_check -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
-         && su root /bin/sh -c "touch /tmp/sufile"'
+         && su root -c "touch /tmp/sufile" \
+         && ftp -o /tmp/example.html http://example.com/'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
     dd if=/dev/zero of=testfile bs=1k count=1
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
+    grep -i '<html' sandbox/tmp/example.html >/dev/null \
+        || atf_fail 'Invalid response from example.com; bad DNS configuration?'
 
     atf_check sandboxctl -c custom.conf destroy
     rm custom.conf

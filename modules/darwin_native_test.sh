@@ -86,7 +86,7 @@ EOF
          && getconf DARWIN_USER_TEMP_DIR >/tmp/getconf \
          && su root -c "touch /tmp/sufile" \
          && cp /etc/resolv.conf /tmp/resolv.conf \
-         && curl example.com >tmp/example.html'
+         && curl example.com >/tmp/example.html'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     [ -s sandbox/tmp/getconf ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
