@@ -773,6 +773,24 @@ EOF
 }
 
 
+atf_test_case run__clean_env
+run__clean_env_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+
+    atf_check \
+        -o not-match:"ABC=" \
+        -o match:"HOME=/tmp" \
+        -o match:"SHELL=/bin/sh" \
+        -o match:"TERM=${TERM}" \
+        -o not-match:"Z=" \
+        env ABC=foo HOME=/foo/bar SHELL=/bin/thesh Z=bar \
+        sandboxctl -c custom.conf run /bin/sh -c env
+}
+
+
 atf_test_case run__shell_is_sh
 run__shell_is_sh_body() {
     create_config_with_mock_type custom.conf "$(pwd)/sandbox"
@@ -875,6 +893,24 @@ mock_mount $(pwd)/sandbox
 mock_unmount $(pwd)/sandbox
 EOF
     echo 'echo 123' | atf_check -o file:expout sandboxctl -c custom.conf shell
+}
+
+
+atf_test_case shell__clean_env
+shell__clean_env_body() {
+    create_config_with_mock_type custom.conf "$(pwd)/sandbox"
+    create_mock_chroot
+
+    mkdir sandbox
+
+    echo env | atf_check \
+        -o not-match:"ABC=" \
+        -o match:"HOME=/tmp" \
+        -o match:"SHELL=/bin/sh" \
+        -o match:"TERM=${TERM}" \
+        -o not-match:"Z=" \
+        env ABC=foo HOME=/foo/bar SHELL=/bin/thesh Z=bar \
+        sandboxctl -c custom.conf shell
 }
 
 
@@ -1034,12 +1070,14 @@ atf_init_test_cases() {
     atf_add_test_case mount_unmount__nested
 
     atf_add_test_case run__ok
+    atf_add_test_case run__clean_env
     atf_add_test_case run__shell_is_sh
     atf_add_test_case run__command_fails
     atf_add_test_case run__validate_config
     atf_add_test_case run__unmount_after_signals
 
     atf_add_test_case shell__ok
+    atf_add_test_case shell__clean_env
     atf_add_test_case shell__shell_is_sh
     atf_add_test_case shell__fail
     atf_add_test_case shell__validate_config
