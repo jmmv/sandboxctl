@@ -129,7 +129,7 @@ test_validate_config() {
 
 atf_test_case config__builtins__no_modules
 config__builtins__no_modules_body() {
-    SANDBOXCTL_MODULESDIR="$(pwd)/no-modules"
+    export SANDBOXCTL_MODULESDIR="$(pwd)/no-modules"
     cat >expout <<EOF
 SANDBOX_ROOT is undefined
 SANDBOX_TYPE = empty
