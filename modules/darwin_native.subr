@@ -79,7 +79,6 @@ _darwin_native_bindfs_mounts() {
                 Graphics) ;;
                 Image\ Capture) ;;
                 Input\ Methods) ;;
-                Internet\ Plug-Ins) ;;
                 Keyboard\ Layouts) ;;
                 Keychains) ;;
                 LaunchAgents) ;;
