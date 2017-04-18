@@ -108,6 +108,8 @@ ATF_ARG_WITH
 
 AC_PATH_PROG([KYUA], [kyua])
 AM_CONDITIONAL([HAVE_KYUA], [test -n "${KYUA}"])
+AC_ARG_VAR([KYUA_FLAGS],
+           [Additional Kyua flags to use at 'make (|dist|install)check' time])
 
 
 AC_SUBST(pkgtestsdir, \${testsdir}/sandboxctl)
