@@ -26,7 +26,7 @@ dnl THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 dnl (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 dnl OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-AC_INIT([sandboxctl], [1.0],
+AC_INIT([sandboxctl], [1.1],
         [https://github.com/jmmv/sandboxctl/issues/], [sandboxctl],
         [https://github.com/jmmv/sandboxctl/])
 AC_PREREQ([2.65])
