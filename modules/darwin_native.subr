@@ -228,8 +228,8 @@ darwin_native_create() {
     for dir in \
         Applications \
         Library/Caches dev home \
-        private/tmp private/var/folders private/var/tmp private/var/root \
-        private/var/run
+        private/tmp private/var/folders private/var/mail private/var/tmp \
+        private/var/root private/var/run
     do
         mkdir -p "${root}/${dir}" || return
     done

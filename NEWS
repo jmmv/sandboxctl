@@ -6,6 +6,9 @@ Changes in version 1.1
 * Fixed the `darwin-native` type to allow accessing the Oracle JRE from
   within the sandbox.
 
+* Expose an empty `/private/var/mail` directory within the `darwin-native`
+  sandbox so that programs that expect the directory to exist can work.
+
 
 Changes in version 1.0
 ======================
