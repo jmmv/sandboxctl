@@ -29,7 +29,8 @@
 # \file test_utils.sh
 # Miscellaneous test-only utilities.
 
-shtk_import sandbox
+: ${SANDBOXCTL_SHTK_MODULESDIR:="__SANDBOXCTL_SHTK_MODULESDIR__"}
+SHTK_MODULESPATH="${SANDBOXCTL_SHTK_MODULESDIR}" shtk_import sandbox
 _SANDBOX_BINDFS_EXTRA_OPTS=,direct_io
 
 

@@ -1,0 +1,14 @@
+dist: trusty
+sudo: required
+
+before_install:
+    - ./admin/travis-install-deps.sh
+
+env:
+    - SHELL_NAME=bash
+    - SHELL_NAME=dash
+    - SHELL_NAME=pdksh
+    - SHELL_NAME=zsh
+
+script:
+    - ./admin/travis-build.sh

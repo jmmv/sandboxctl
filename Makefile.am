@@ -37,6 +37,7 @@ BUILD_SED = \
 	    -e 's,__BINDFS__,$(BINDFS),g' \
 	    -e 's,__SANDBOXCTL_ETCDIR__,$(sandboxctl_confdir),g' \
 	    -e 's,__SANDBOXCTL_MODULESDIR__,$(pkgdatadir),g' \
+	    -e 's,__SANDBOXCTL_SHTK_MODULESDIR__,$(pkgdatadir)/shtk,g' \
 	    -e 's,__SHTK__,$(SHTK_TOOL),g'
 BUILD_SCRIPT = \
 	cat $${sources} | $(BUILD_SED) | \
@@ -90,7 +91,7 @@ default.conf: $(srcdir)/examples/$(SANDBOXCTL_OS).conf
 
 EXTRA_DIST += test_utils.sh
 
-shtk_modulesdir = $(SHTK_MODULESDIR)
+shtk_modulesdir = $(pkgdatadir)/shtk
 nodist_shtk_modules_DATA = sandbox.subr
 CLEANFILES += sandbox.subr
 EXTRA_DIST += sandbox.subr.in
@@ -196,7 +197,7 @@ endif
 if HAVE_KYUA
 CHECK_ENVIRONMENT  = PATH=$(abs_top_builddir):$${PATH}
 CHECK_ENVIRONMENT += SANDBOXCTL_MODULESDIR=$(abs_top_srcdir)/modules
-CHECK_ENVIRONMENT += SHTK_MODULESPATH=$(abs_top_srcdir):$${SHTK_MODULESPATH}
+CHECK_ENVIRONMENT += SANDBOXCTL_SHTK_MODULESDIR=$(abs_top_builddir)
 INSTALLCHECK_ENVIRONMENT = PATH=$(prefix)/sbin:$${PATH}
 
 # Allow the caller to override the configuration file passed to our test runs

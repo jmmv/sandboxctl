@@ -32,7 +32,8 @@
 shtk_import cleanup
 shtk_import cli
 shtk_import config
-shtk_import sandbox
+: ${SANDBOXCTL_SHTK_MODULESDIR:="__SANDBOXCTL_SHTK_MODULESDIR__"}
+SHTK_MODULESPATH="${SANDBOXCTL_SHTK_MODULESDIR}" shtk_import sandbox
 
 
 # Location of the sandboxctl configuration files.

@@ -133,6 +133,15 @@ The following environment variables are specific to sandboxctl's
   configure script will try to look for this in the path and abort if
   not found.
 
+* KYUA_FLAGS:
+  Possible values: empty, multiple flags as one string.
+  Default: empty.
+
+  Specifies additional flags to pass to Kyua when running any of the
+  `check`, `installcheck` or `distcheck` targets on this source tree.
+  This setting is exclusively used to customize the test runs of Kyua
+  itself and has no effect whatsoever on the built product.
+
 * SANDBOXCTL_CONFSUBDIR
   Possible values: empty, a relative path.
   Default: sandboxctl.

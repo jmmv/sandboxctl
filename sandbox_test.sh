@@ -26,7 +26,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-shtk_import sandbox
+: ${SANDBOXCTL_SHTK_MODULESDIR:="__SANDBOXCTL_SHTK_MODULESDIR__"}
+SHTK_MODULESPATH="${SANDBOXCTL_SHTK_MODULESDIR}" shtk_import sandbox
 _SANDBOX_BINDFS_EXTRA_OPTS=,direct_io
 
 
@@ -635,7 +636,7 @@ destroy__abort_if_still_mounted_head() {
 }
 destroy__abort_if_still_mounted_body() {
     cat >script.sh <<EOF
-shtk_import sandbox
+SHTK_MODULESPATH="${SANDBOXCTL_SHTK_MODULESDIR}" shtk_import sandbox
 main() {
     chmod() { touch chmod-called; }
     sandbox_destroy "\${1}"
@@ -658,7 +659,7 @@ destroy__abort_if_still_mounted_cleanup() {
 atf_test_case destroy__abort_if_root
 destroy__abort_if_root_body() {
     cat >script.sh <<EOF
-shtk_import sandbox
+SHTK_MODULESPATH="${SANDBOXCTL_SHTK_MODULESDIR}" shtk_import sandbox
 main() {
     chmod() { touch chmod-called; }
     sandbox_destroy "\${1}"
