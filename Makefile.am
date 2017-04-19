@@ -196,7 +196,7 @@ endif
 if HAVE_KYUA
 CHECK_ENVIRONMENT  = PATH=$(abs_top_builddir):$${PATH}
 CHECK_ENVIRONMENT += SANDBOXCTL_MODULESDIR=$(abs_top_srcdir)/modules
-CHECK_ENVIRONMENT += SHTK_MODULESPATH=$(abs_top_srcdir):$${SHTK_MODULESPATH}
+CHECK_ENVIRONMENT += SHTK_MODULESPATH=$(abs_top_builddir):$${SHTK_MODULESPATH}
 INSTALLCHECK_ENVIRONMENT = PATH=$(prefix)/sbin:$${PATH}
 
 # Allow the caller to override the configuration file passed to our test runs
