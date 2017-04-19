@@ -33,10 +33,17 @@ shtk_import cli
 shtk_import config
 shtk_import sandbox
 
-# List of directories to null-mount in read-only mode.
-_NETBSD_NATIVE_BINDFS_MOUNTS="
-    bin lib libdata libexec sbin
-    usr/bin usr/include usr/lib usr/libdata usr/libexec usr/sbin usr/share"
+# Prints the list of directories to null-mount in read-only mode.
+_netbsd_native_bindfs_mounts() {
+    echo bin lib libdata libexec sbin
+    echo usr/bin usr/include usr/lib usr/libdata usr/libexec usr/sbin usr/share
+
+    # The distribution images for NetBSD/evbarm-earmv7hf 7.1 have /boot
+    # directory containing the kernel (which is a separate partition) instead of
+    # a /netbsd file.  Other ports that require the kernel to be placed on
+    # dedicated partitions may suffer from this same oddity.
+    [ ! -d /boot ] || echo boot
+}
 
 
 # Prints the configuration variables exposed by this sandbox type.
@@ -63,12 +70,16 @@ netbsd_native_create() {
     [ -d "${releasedir}" ] || shtk_cli_error "Release directory ${releasedir}" \
         "does not exist"
 
-    for dir in ${_NETBSD_NATIVE_BINDFS_MOUNTS}; do
+    for dir in $(_netbsd_native_bindfs_mounts); do
         mkdir -p "${root}/${dir}" || return
     done
     mkdir "${root}/home"
 
-    cp /netbsd "${root}/netbsd" || return
+    # /netbsd should exist according to hier(7), but if it doesn't, silently
+    # ignore it.  See note above on /boot for details.
+    if [ -e /netbsd ]; then
+        cp /netbsd "${root}/netbsd" || return
+    fi
 
     sandbox_extract "${releasedir}/binary/sets/base.tgz" "${root}" \
                     ./etc ./root ./tmp ./var
@@ -88,7 +99,7 @@ netbsd_native_mount() {
 
     cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
 
-    for dir in ${_NETBSD_NATIVE_BINDFS_MOUNTS}; do
+    for dir in $(_netbsd_native_bindfs_mounts); do
         sandbox_bindfs "/${dir}" "${root}/${dir}"
     done
 }
