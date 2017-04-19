@@ -42,7 +42,8 @@ shtk_import sandbox
 _darwin_native_bindfs_mounts() {
     for dir in System \
                bin opt/X11 private/etc sbin \
-               usr/bin usr/include usr/lib usr/libexec usr/sbin usr/share
+               usr/bin usr/include usr/lib usr/libexec usr/local usr/sbin \
+               usr/share
     do
         echo "${dir}"
     done
