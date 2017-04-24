@@ -118,86 +118,55 @@ _darwin_native_bindfs_mounts() {
 }
 
 
-# Reconfigure mDNSResponder to listen on a socket within the sandbox.
+# Start a new mDNSResponder instance to listen on a socket in the sandbox.
 #
 # To have proper name resolution within the sandbox, we need to tell
 # mDNSResponder to create a new socket within the sandbox's /var/run directory.
 # Simply bind-mounting the socket is insufficient because macOS denies access to
 # it from a chrooted process.
 #
-# To do the reconfiguration, we create a new service plist and add our socket
-# location to it.  We then reload the system service using this new copy.  We do
-# not modify the original plist to avoid damaging it, though this could cause
-# issues for us if a separate process decides to reload the system service using
-# the global configuration (e.g. we'd lose our socket).  This seems unlikely so
-# it is better to keep the system configuration safe: worst case, the user can
-# reboot the machine to bring it back to a known good state.
+# To do the reconfiguration, we copy the system-wide mDNSResponder service
+# configuration and modify it to act as a brand new service for the sandbox.
+# macOS's SIP does not allow us to modify the live instance, which is probably
+# for the better: running a separate instance is easier to handle.
 #
 # \param root Path to the sandbox directory.
 _darwin_native_start_mdnsresponder() {
     local root="${1}"; shift
 
     local sys_plist=/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist
-    local new_plist="${root}/tmp/com.apple.mDNSResponder.plist"
-    local tmp="${new_plist}.tmp"
+    local new_plist="${root}/tmp/local.com.apple.mDNSResponder.plist"
     plb() { /usr/libexec/PlistBuddy "${@}"; }
 
     shtk_cli_debug "Configuring mDNSResponder socket in sandbox"
 
     cp "${sys_plist}" "${new_plist}"
+    plb -c "Set Label local.com.apple.mDNSResponder.$(date +%s)" "${new_plist}"
+    plb -c "Delete MachServices" "${new_plist}"
+    plb -c "Set Sockets:Listeners:SockPathName ${root}/var/run/mDNSResponder" \
+        "${new_plist}"
+    chmod 400 "${new_plist}"
 
-    # When there is just one entry in Sockets:Listeners, this node can be either
-    # a dictionary or an array.  Make sure it's an array in any case for our new
-    # copy of the plist so that we can extend it later.
-    plb -x -c "Print Sockets:Listeners" "${sys_plist}" >"${tmp}"
-    if grep '^<dict>$' "${tmp}" >/dev/null; then
-        plb -c "Delete Sockets:Listeners" "${new_plist}"
-        plb -c "Add Sockets:Listeners array" "${new_plist}"
-        plb -c "Add Sockets:Listeners:0 dict" "${new_plist}"
-        plb -c "Merge ${tmp} Sockets:Listeners:0" "${new_plist}"
-    fi
-    rm -f "${tmp}"
-
-    # Now add our own entry to Sockets:Listeners.  Because we reused a copy of
-    # the fresh system-wide configuration file, we know we are not there yet.
-    cat >"${tmp}" <<EOF
-<array>
-    <dict>
-        <key>SockFamily</key>
-        <string>Unix</string>
-        <key>SockPathMode</key>
-        <integer>438</integer>
-        <key>SockPathName</key>
-        <string>${root}/var/run/mDNSResponder</string>
-    </dict>
-</array>
-EOF
-    plb -c "Merge ${tmp} Sockets:Listeners" "${new_plist}"
-    rm -f "${tmp}"
-
-    launchctl unload "${sys_plist}"
     launchctl load "${new_plist}"
 }
 
 
-# Restore the system-wide mDNSResponder configuration.
+# Stop the sandbox-specific mDNSResponder instance.
 #
-# This is idempotent: we only reload the system service if our sandboxed
-# configuration exists, at which point we delete it to ensure subsequent calls
-# do nothing.
+# This is idempotent to ensure we can call this function both at the sandbox's
+# unmount and destruction times.  Doing so simplifies the caller code and
+# provides better assurances that the service is stopped when cleaning up the
+# sandbox.
 #
 # \param root Path to the sandbox directory.
 _darwin_native_stop_mdnsresponder() {
     local root="${1}"; shift
 
-    local sys_plist=/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist
-    local our_plist="${root}/tmp/com.apple.mDNSResponder.plist"
-
+    local our_plist="${root}/tmp/local.com.apple.mDNSResponder.plist"
     if [ -e "${our_plist}" ]; then
-        shtk_cli_debug "Restoring system-wide mDNSResponder settings"
+        shtk_cli_debug "Stopping sandbox-specific mDNSResponder instance"
 
         launchctl unload "${our_plist}"
-        launchctl load "${sys_plist}"
         rm -f "${our_plist}"
     fi
 }

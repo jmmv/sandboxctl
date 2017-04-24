@@ -16,6 +16,10 @@ Changes in version 1.1
   and to ignore the lack of `/netbsd`, as is the case for
   NetBSD/evbarm-earmv7hf 7.1 Raspberry Pi images.
 
+* Issue 5: Fixed DNS resolution in `darwin-native` sandboxes, which
+  apparently got broken in the macOS Sierra 10.12.4 update because SIP
+  now prevents modifying the running mDNSResponder instance.
+
 
 Changes in version 1.0
 ======================
