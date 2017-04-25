@@ -12,6 +12,10 @@ Changes in version 1.1
 * Expose an empty `/private/var/mail` directory within the `darwin-native`
   sandbox so that programs that expect the directory to exist can work.
 
+* Issue 2: Fixed access to the system keychain on `darwin-native`
+  sandboxes, which allows, among other things, for HTTPS downloads to
+  work properly.
+
 * Issue 4: Fixed the `netbsd-native` type to recognize a `/boot` directory
   and to ignore the lack of `/netbsd`, as is the case for
   NetBSD/evbarm-earmv7hf 7.1 Raspberry Pi images.

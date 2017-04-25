@@ -80,13 +80,15 @@ EOF
     # - Writability of /tmp, which is usually a symlink.
     # - Writability of /var (via getconf).
     # - Name resolution works with mDNSResponder (via curl).
+    # - Access to the system keychain works (via an HTTPS curl download).
     atf_check -o ignore -e ignore sandboxctl -c custom.conf run /bin/sh -c \
         'dd if=/dev/zero of=/tmp/testfile bs=1k count=1 \
          && chown root /tmp/testfile \
          && getconf DARWIN_USER_TEMP_DIR >/tmp/getconf \
          && su root -c "touch /tmp/sufile" \
          && cp /etc/resolv.conf /tmp/resolv.conf \
-         && curl example.com >/tmp/example.html'
+         && curl example.com >/tmp/example.html \
+         && curl -IsS https://github.com/ | head -n 1 >/tmp/github.head'
     [ -f sandbox/tmp/testfile ] || atf_fail 'Test file not created as expected'
     [ -s sandbox/tmp/getconf ] || atf_fail 'Test file not created as expected'
     [ -f sandbox/tmp/sufile ] || atf_fail 'Test file not created as expected'
@@ -95,6 +97,8 @@ EOF
     cmp -s sandbox/tmp/testfile testfile || atf_fail 'Test file invalid'
     grep -i '<html' sandbox/tmp/example.html >/dev/null \
         || atf_fail 'Invalid response from example.com; bad DNS configuration?'
+    grep -i 'HTTP.* OK' sandbox/tmp/github.head >/dev/null \
+        || atf_fail 'Invalid response from github.com; bad security settings?'
 
     atf_check sandboxctl -c custom.conf destroy
     rm custom.conf
