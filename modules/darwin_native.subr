@@ -189,6 +189,18 @@ darwin_native_set_defaults() {
 darwin_native_create() {
     local root="${1}"; shift
 
+    case "$(csrutil status)" in
+        *disabled*) ;;
+        *)
+            shtk_cli_warning "System Integrity Protection (SIP) seems to" \
+                "be enabled; the sandbox will likely misbehave!" \
+                "Please disable SIP"
+            shtk_cli_warning "Sleeping 5 seconds before continuing; press" \
+                "CTRL+C to abort now"
+            sleep 5
+            ;;
+    esac
+
     _darwin_native_bindfs_mounts | \
         while read dir; do
             mkdir -p "${root}/${dir}" || return
