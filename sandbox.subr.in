@@ -272,7 +272,7 @@ sandbox_unmount_dirs() {
             sandbox_has_mounts "${dir}" || break
 
             shtk_cli_debug "Mount point ${dir} has not disappeared yet; waiting"
-            sleep .1
+            sleep .5
             retries=$((${retries} - 1))
         done
         [ ${retries} -gt 0 ] || shtk_cli_error "Failed to unmount ${dir}"
