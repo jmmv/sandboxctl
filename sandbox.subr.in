@@ -272,7 +272,7 @@ sandbox_unmount_dirs() {
             sandbox_has_mounts "${dir}" || break
 
             shtk_cli_debug "Mount point ${dir} has not disappeared yet; waiting"
-            sleep .1
+            sleep .5
             retries=$((${retries} - 1))
         done
         [ ${retries} -gt 0 ] || shtk_cli_error "Failed to unmount ${dir}"
@@ -422,9 +422,26 @@ sandbox_bindfs() {
             [ -n "${bindfs}" ] || shtk_abort "bindfs should have been" \
                 "detected at configuration time"
 
-            "${bindfs}" -o "${mode}${_SANDBOX_BINDFS_EXTRA_OPTS}" \
-                "${source}" "${mount_point}" \
-                || shtk_cli_error "Failed to bind ${mount_point}"
+            (
+                # Starting from macOS Mojave (or maybe even High Sierra),
+                # running a complex binary like xcodebuild within the sandbox
+                # causes bindfs to run out of file descriptors.  I haven't
+                # tracked down why that's the case: maybe there are newer
+                # lower limits, or maybe some library used by bindfs needs to
+                # open more files.  Just raise the limit here.
+                local limit="$(ulimit -H -n)"
+                if [ "${limit}" = unlimited ]; then
+                    # Even if the hard limit is "unlimited", we can't tell
+                    # ulimit to set that value: instead, we have to limit our
+                    # request to what the kernel real limits are.
+                    limit="$(sysctl -n kern.maxfilesperproc)"
+                fi
+                ulimit -S -n "${limit}"
+
+                exec "${bindfs}" -o "${mode}${_SANDBOX_BINDFS_EXTRA_OPTS}" \
+                    "${source}" "${mount_point}" \
+                    || shtk_cli_error "Failed to bind ${mount_point}"
+            )
 
             local retries=50
             while [ ${retries} -gt 0 ] && ! sandbox_has_mounts "${mount_point}"

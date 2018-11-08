@@ -24,6 +24,10 @@ Changes in version 1.1
   apparently got broken in the macOS Sierra 10.12.4 update because SIP
   now prevents modifying the running mDNSResponder instance.
 
+* Issue 7: Fixed execution of compilers and other Xcode tools within a
+  `darwin-native` sandbox starting with High Sierra.  Unfortunately, we
+  now require SIP to be disabled for these tools to work.
+
 
 Changes in version 1.0
 ======================

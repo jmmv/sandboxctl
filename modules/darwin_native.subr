@@ -189,6 +189,18 @@ darwin_native_set_defaults() {
 darwin_native_create() {
     local root="${1}"; shift
 
+    case "$(csrutil status)" in
+        *disabled*) ;;
+        *)
+            shtk_cli_warning "System Integrity Protection (SIP) seems to" \
+                "be enabled; the sandbox will likely misbehave!" \
+                "Please disable SIP"
+            shtk_cli_warning "Sleeping 5 seconds before continuing; press" \
+                "CTRL+C to abort now"
+            sleep 5
+            ;;
+    esac
+
     _darwin_native_bindfs_mounts | \
         while read dir; do
             mkdir -p "${root}/${dir}" || return
@@ -208,7 +220,15 @@ darwin_native_create() {
         ( cd "${root}" && ln -s "private/${dir}" "${dir}" ) || return
     done
     # Must come last to prevent creating var until it's a symlink.
-    mkdir -p "${root}/${HOME}" || return
+    local user_cache_dir="$(getconf DARWIN_USER_CACHE_DIR)"
+    local user_dir="$(getconf DARWIN_USER_DIR)"
+    local user_temp_dir="$(getconf DARWIN_USER_TEMP_DIR)"
+    for dir in "${user_cache_dir}" "${user_dir}" "${user_temp_dir}" "${HOME}"
+    do
+        mkdir -p "${root}/${dir}" || return
+    done
+    chmod 700 "${root}/${user_cache_dir}"
+    chmod 700 "${root}/${user_temp_dir}"
 
     # Ideally we'd null-mount /Applications within the sandbox to get access to
     # Xcode and any other applications installed in the host system.
