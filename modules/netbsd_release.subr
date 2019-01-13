@@ -49,6 +49,20 @@ netbsd_release_set_defaults() {
 }
 
 
+# Guesses the format of the release sets and returns their extension.
+#
+# \param releasedir Path to the root directory of the release files.
+_netbsd_release_sets_format() {
+    local releasedir="${1}"; shift
+
+    if [ -e "${releasedir}/binary/sets/base.tar.xz" ]; then
+        echo "tar.xz"
+    else
+        echo "tgz"
+    fi
+}
+
+
 # Computes the collection of sets to extract for the release.
 #
 # If the user has specified NETBSD_SETS in the configuration file, we respect
@@ -56,14 +70,16 @@ netbsd_release_set_defaults() {
 #
 # Otherwise, we automatically expand all the sets in the release directory.
 # Because a release directory can include more than one kern-* set, we prefer a
-# kern-GENERIC.tgz if it exists; else, we pick the first name in lexicographical
+# kern-GENERIC if it exists; else, we pick the first name in lexicographical
 # order.
 #
-# \param releasedir Path to the root directory of the release files
+# \param releasedir Path to the root directory of the release files.
 #
-# \post Prints the name of the detected sets, including their .tgz extensions.
+# \post Prints the name of the detected sets, including their extensions.
 _netbsd_release_get_sets() {
     local releasedir="${1}"; shift
+
+    local ext="$(_netbsd_release_sets_format "${releasedir}")"
 
     if shtk_config_has NETBSD_RELEASE_SETS; then
         # sandboxctl 1.0 used to require the set names to be suffixed with .tgz
@@ -75,13 +91,13 @@ _netbsd_release_get_sets() {
         for set_name in "${@}"; do
             case "${set_name}" in
                 *.*) echo "${set_name}" ;;
-                *) echo "${set_name}.tgz" ;;
+                *) echo "${set_name}.${ext}" ;;
             esac
         done
     else
         local kernel_set=
         for name in $(cd "${releasedir}/binary/sets" \
-                      && echo *.tgz | fmt 1 | sort)
+                      && echo *.${ext} | fmt 1 | sort)
         do
             case "${name}" in
                 kern-GENERIC.*)
@@ -112,9 +128,9 @@ netbsd_release_create() {
 
     local sets="$(_netbsd_release_get_sets "${releasedir}")"
 
-    for tgz_set in ${sets}; do
-        sandbox_extract "${releasedir}/binary/sets/${tgz_set}" \
-            "${root}" || shtk_cli_error "Failed to extract ${tgz_set}"
+    for tar_set in ${sets}; do
+        sandbox_extract "${releasedir}/binary/sets/${tar_set}" \
+            "${root}" || shtk_cli_error "Failed to extract ${tar_set}"
     done
 
     shtk_cli_debug "Creating device nodes"

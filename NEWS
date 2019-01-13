@@ -30,10 +30,10 @@ Changes in version 1.1
 
 * Added support for XZ-compressed files to `sandbox_extract`.
 
-* The `NETBSD_RELEASE_SETS` setting in `netbsd-release` now takes a list
-  of set names *without* their extension.  This allows `sandboxctl` to
-  automatically determine the compression format depending on the NetBSD
-  release in use.
+* Added support for XZ-compressed release sets to `netbsd-native` and
+  `netbsd-release`.  As a side-effect of this change, the
+  `NETBSD_RELEASE_SETS` setting in `netbsd-release` now takes a list
+  of set names *without* their extension.
 
 
 Changes in version 1.0

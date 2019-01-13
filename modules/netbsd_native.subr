@@ -60,6 +60,20 @@ netbsd_native_set_defaults() {
 }
 
 
+# Guesses the format of the release sets and returns their extension.
+#
+# \param releasedir Path to the root directory of the release files.
+_netbsd_release_sets_format() {
+    local releasedir="${1}"; shift
+
+    if [ -e "${releasedir}/binary/sets/base.tar.xz" ]; then
+        echo "tar.xz"
+    else
+        echo "tgz"
+    fi
+}
+
+
 # Sets up a NetBSD sandbox that uses null mounts.
 #
 # \param root Path to the sandbox directory.
@@ -81,9 +95,11 @@ netbsd_native_create() {
         cp /netbsd "${root}/netbsd" || return
     fi
 
-    sandbox_extract "${releasedir}/binary/sets/base.tgz" "${root}" \
+    local ext="$(_netbsd_release_sets_format "${releasedir}")"
+
+    sandbox_extract "${releasedir}/binary/sets/base.${ext}" "${root}" \
                     ./etc ./root ./tmp ./var
-    sandbox_extract "${releasedir}/binary/sets/etc.tgz" "${root}"
+    sandbox_extract "${releasedir}/binary/sets/etc.${ext}" "${root}"
 
     shtk_cli_debug "Creating device nodes"
     ( cd "${root}/dev" && ./MAKEDEV all ) \
