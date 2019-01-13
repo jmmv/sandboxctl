@@ -680,15 +680,17 @@ EOF
 
 # Creates a test tarball with some files in it.
 #
-# \param tgz Path to the tarball to be created.
-create_test_tgz() {
-    local tgz="${1}"; shift
+# \param path Path to the tarball to be created.
+# \param format Compression format as indicated by tar's flag.
+create_test_tar() {
+    local path="${1}"; shift
+    local format="${1}"; shift
 
     mkdir dir1 dir2
     touch dir1/file1 dir1/file2 dir2/file1
 
-    mkdir -p "$(dirname "${tgz}")"
-    tar -czf "${tgz}" dir1 dir2
+    mkdir -p "$(dirname "${path}")"
+    tar "-c${format}f" "${path}" dir1 dir2
 
     rm -rf dir1 dir2
 }
@@ -696,7 +698,7 @@ create_test_tgz() {
 
 atf_test_case extract__all__not_verbose
 extract__all__not_verbose_body() {
-    create_test_tgz dist/test.tgz
+    create_test_tar dist/test.tgz z
 
     mkdir destdir
     sandbox_extract dist/test.tgz destdir
@@ -713,9 +715,27 @@ extract__all__verbose_body() {
 }
 
 
+atf_test_case extract__all__formats
+extract__all__formats_body() {
+    create_test_tar dist/test.tar.gz z
+    create_test_tar dist/test.tgz z
+    create_test_tar dist/test.tar.xz J
+    create_test_tar dist/test.txz J
+
+    for f in dist/test.tar.gz dist/test.tgz dist/test.tar.xz dist/test.txz; do
+        mkdir destdir
+        sandbox_extract "${f}" destdir
+        [ -f destdir/dir1/file1 ] || atf_fail "File missing after extraction"
+        [ -f destdir/dir1/file2 ] || atf_fail "File missing after extraction"
+        [ -f destdir/dir2/file1 ] || atf_fail "File missing after extraction"
+        rm -rf destdir
+    done
+}
+
+
 atf_test_case extract__some__not_verbose
 extract__some__not_verbose_body() {
-    create_test_tgz dist/test.tgz
+    create_test_tar dist/test.tgz z
 
     mkdir destdir
     sandbox_extract dist/test.tgz "$(pwd)/destdir" dir1/file2 dir2
@@ -734,7 +754,7 @@ extract__some__verbose_body() {
 
 atf_test_case extract__error__not_verbose
 extract__error__not_verbose_body() {
-    create_test_tgz dist/test.tgz
+    create_test_tar dist/test.tgz z
 
     if ( sandbox_extract dist/test.tgz destdir ) 2>err; then
         atf_fail "sandbox_extract did not raise an error"
@@ -920,6 +940,7 @@ atf_init_test_cases() {
 
     atf_add_test_case extract__all__not_verbose
     atf_add_test_case extract__all__verbose
+    atf_add_test_case extract__all__formats
     atf_add_test_case extract__some__not_verbose
     atf_add_test_case extract__some__verbose
     atf_add_test_case extract__error__not_verbose

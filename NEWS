@@ -28,6 +28,8 @@ Changes in version 1.1
   `darwin-native` sandbox starting with High Sierra.  Unfortunately, we
   now require SIP to be disabled for these tools to work.
 
+* Added support for XZ-compressed files to `sandbox_extract`.
+
 
 Changes in version 1.0
 ======================
