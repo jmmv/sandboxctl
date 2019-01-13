@@ -66,7 +66,18 @@ _netbsd_release_get_sets() {
     local releasedir="${1}"; shift
 
     if shtk_config_has NETBSD_RELEASE_SETS; then
-        shtk_config_get NETBSD_RELEASE_SETS
+        # sandboxctl 1.0 used to require the set names to be suffixed with .tgz
+        # but we do not require this any longer: starting from NetBSD 8.99.x,
+        # the release can be built with .tar.xz, so we need to auto-detect which
+        # one is in use.  For backwards compatibility, keep any extensions given
+        # by the user.
+        set -- $(shtk_config_get NETBSD_RELEASE_SETS)
+        for set_name in "${@}"; do
+            case "${set_name}" in
+                *.*) echo "${set_name}" ;;
+                *) echo "${set_name}.tgz" ;;
+            esac
+        done
     else
         local kernel_set=
         for name in $(cd "${releasedir}/binary/sets" \

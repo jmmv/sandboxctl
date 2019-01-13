@@ -78,7 +78,7 @@ SANDBOX_ROOT="$(pwd)/sandbox"
 SANDBOX_TYPE="netbsd-release"
 
 NETBSD_RELEASE_RELEASEDIR="$(atf_config_get netbsd_releasedir)"
-NETBSD_RELEASE_SETS="base.tgz etc.tgz"
+NETBSD_RELEASE_SETS="base etc"
 EOF
 
     atf_check -e not-match:' W: ' -e not-match:' E: ' \

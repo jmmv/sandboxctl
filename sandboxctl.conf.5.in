@@ -195,18 +195,14 @@ subdirectory of the given path.
 Default:
 .Pa /home/sysbuild/release/$(uname -m)
 .It Va NETBSD_RELEASE_SETS
-Basename of the sets to unpack inside the sandbox, without their
-.Sq .tgz
-extension.
+Basename of the sets to unpack inside the sandbox, without their extension.
 .Pp
 If this variable is unset,
 .Xr sandboxctl 8
 will automatically determine the sets to extract based on the contents of the
 .Va NETBSD_RELEASE_RELEASEDIR
 directory.
-In particular, all available
-.Sq .tgz
-userland sets will be extracted.
+In particular, all available userland sets will be extracted.
 As for the kernel,
 .Sq kern-GENERIC
 will be preferred over any other kernel set but, if not present, the first
