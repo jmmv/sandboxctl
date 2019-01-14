@@ -37,17 +37,37 @@
 : ${SANDBOXCTL_MODULESDIR="__SANDBOXCTL_MODULESDIR__"}
 
 
-# Creates a fake tgz set with a single file in it.
+# Creates a fake set with a single file in it.
 #
 # \param releasedir Path to the root of the release directory.
-# \param name Basename of the set to create, without an extension.
+# \param name Basename of the set to create.
 create_set() {
     local releasedir="${1}"; shift
     local name="${1}"; shift
 
+    local flag
+    case "${name}" in
+        *.tar.xz) flag=J ;;
+        *.tgz) flag=z ;;
+    esac
+
     touch "${name}.cookie"
-    tar -cz -f "${releasedir}/binary/sets/${name}.tgz" "${name}.cookie"
+    tar "-c${flag}" -f "${releasedir}/binary/sets/${name}" "${name}.cookie"
     rm "${name}.cookie"
+}
+
+
+# Guesses the format of the release sets and returns their extension.
+#
+# \param releasedir Path to the root directory of the release files.
+guess_sets_format() {
+    local releasedir="${1}"; shift
+
+    if [ -e "${releasedir}/binary/sets/base.tar.xz" ]; then
+        echo "tar.xz"
+    else
+        echo "tgz"
+    fi
 }
 
 
@@ -78,7 +98,7 @@ SANDBOX_ROOT="$(pwd)/sandbox"
 SANDBOX_TYPE="netbsd-release"
 
 NETBSD_RELEASE_RELEASEDIR="$(atf_config_get netbsd_releasedir)"
-NETBSD_RELEASE_SETS="base.tgz etc.tgz"
+NETBSD_RELEASE_SETS="base etc"
 EOF
 
     atf_check -e not-match:' W: ' -e not-match:' E: ' \
@@ -119,17 +139,19 @@ auto_sets_head() {
 auto_sets_body() {
     [ "$(uname -s)" = 'NetBSD' ] || atf_skip "Requires a NetBSD host"
 
+    local ext="$(guess_sets_format "$(atf_config_get netbsd_releasedir)")"
+
     mkdir -p release/binary/sets
-    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/base.tgz" \
+    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/base.${ext}" \
         release/binary/sets/
-    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/etc.tgz" \
+    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/etc.${ext}" \
         release/binary/sets/
     touch release/binary/sets/NOT-A-SET
-    create_set release extra1
-    create_set release extra2
-    create_set release kern-A
-    create_set release kern-GENERIC
-    create_set release kern-Z
+    create_set release extra1."${ext}"
+    create_set release extra2."${ext}"
+    create_set release kern-A."${ext}"
+    create_set release kern-GENERIC."${ext}"
+    create_set release kern-Z."${ext}"
 
     cat >custom.conf <<EOF
 SANDBOX_ROOT="$(pwd)/sandbox"
@@ -143,11 +165,13 @@ EOF
         sandboxctl -c custom.conf create
 
     for set_name in extra1 extra2 kern-GENERIC; do
-        [ -f sandbox/"${set_name}.cookie" ] \
+        [ -f sandbox/"${set_name}.${ext}.cookie" ] \
             || atf_fail "${set_name} not extracted"
     done
-    [ ! -f sandbox/kern-A.cookie ] || atf_fail "Unexpected kernel A extracted"
-    [ ! -f sandbox/kern-Z.cookie ] || atf_fail "Unexpected kernel Z extracted"
+    [ ! -f "sandbox/kern-A.${ext}.cookie" ] \
+        || atf_fail "Unexpected kernel A extracted"
+    [ ! -f "sandbox/kern-Z.${ext}.cookie" ] \
+        || atf_fail "Unexpected kernel Z extracted"
 
     sandboxctl -c custom.conf destroy
     rm custom.conf
@@ -165,13 +189,15 @@ auto_sets__no_generic_head() {
 auto_sets__no_generic_body() {
     [ "$(uname -s)" = 'NetBSD' ] || atf_skip "Requires a NetBSD host"
 
+    local ext="$(guess_sets_format "$(atf_config_get netbsd_releasedir)")"
+
     mkdir -p release/binary/sets
-    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/base.tgz" \
+    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/base.${ext}" \
         release/binary/sets/
-    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/etc.tgz" \
+    ln -s "$(atf_config_get netbsd_releasedir)/binary/sets/etc.${ext}" \
         release/binary/sets/
-    create_set release kern-A
-    create_set release kern-Z
+    create_set release kern-A."${ext}"
+    create_set release kern-Z."${ext}"
 
     cat >custom.conf <<EOF
 SANDBOX_ROOT="$(pwd)/sandbox"
@@ -184,13 +210,73 @@ EOF
     atf_check -e not-match:' W: ' -e not-match:' E: ' \
         sandboxctl -c custom.conf create
 
-    [ -f sandbox/kern-A.cookie ] || atf_fail "Expected kernel A not extracted"
-    [ ! -f sandbox/kern-Z.cookie ] || atf_fail "Unexpected kernel Z extracted"
+    [ -f "sandbox/kern-A.${ext}.cookie" ] \
+        || atf_fail "Expected kernel A not extracted"
+    [ ! -f "sandbox/kern-Z.${ext}.cookie" ] \
+        || atf_fail "Unexpected kernel Z extracted"
 
     sandboxctl -c custom.conf destroy
     rm custom.conf
 }
-auto_sets_cleanup() {
+auto_sets__no_generic_cleanup() {
+    [ ! -f custom.conf ] || sandboxctl -c custom.conf destroy || true
+}
+
+
+atf_test_case auto_sets__other_format
+auto_sets__other_format_head() {
+    atf_set "require.config" "netbsd_releasedir"
+    atf_set "require.user" "root"
+}
+auto_sets__other_format_body() {
+    [ "$(uname -s)" = 'NetBSD' ] || atf_skip "Requires a NetBSD host"
+
+    local ext="$(guess_sets_format "$(atf_config_get netbsd_releasedir)")"
+    local other_ext=
+
+    mkdir -p release/binary/sets
+    for set_name in base etc; do
+        local src="$(atf_config_get netbsd_releasedir)"
+        src="${src}/binary/sets/${set_name}.${ext}"
+        case "${ext}" in
+            tar.xz)
+                xz -cd "${src}" \
+                    | gzip -c1 >"release/binary/sets/${set_name}.tgz"
+                other_ext=tgz
+                ;;
+            tgz)
+                gzip -cd "${src}" \
+                    | xz -c0 >"release/binary/sets/${set_name}.tar.xz"
+                other_ext=tar.xz
+                ;;
+            *)
+                atf_fail "Don't know how to handle format ${ext}"
+        esac
+    done
+    create_set release foo."${other_ext}"
+    create_set release bar."${ext}"
+
+    cat >custom.conf <<EOF
+SANDBOX_ROOT="$(pwd)/sandbox"
+SANDBOX_TYPE="netbsd-release"
+
+NETBSD_RELEASE_RELEASEDIR="$(pwd)/release"
+NETBSD_RELEASE_SETS=
+EOF
+
+    atf_check -e not-match:' W: ' -e not-match:' E: ' \
+        sandboxctl -c custom.conf create
+
+    [ -f sandbox/bin/ls ] || atf_fail "Expected set base not extracted"
+    [ -f "sandbox/foo.${other_ext}.cookie" ] \
+        || atf_fail "Expected set foo not extracted"
+    [ ! -f "sandbox/bar.${ext}.cookie" ] \
+        || atf_fail "Unexpected set bar extracted"
+
+    sandboxctl -c custom.conf destroy
+    rm custom.conf
+}
+auto_sets__other_format_cleanup() {
     [ ! -f custom.conf ] || sandboxctl -c custom.conf destroy || true
 }
 
@@ -202,4 +288,5 @@ atf_init_test_cases() {
 
     atf_add_test_case auto_sets
     atf_add_test_case auto_sets__no_generic
+    atf_add_test_case auto_sets__other_format
 }

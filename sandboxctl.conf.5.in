@@ -25,7 +25,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd November 7, 2018
+.Dd January 13, 2019
 .Dt SANDBOXCTL.CONF 5
 .Os
 .Sh NAME
@@ -195,18 +195,14 @@ subdirectory of the given path.
 Default:
 .Pa /home/sysbuild/release/$(uname -m)
 .It Va NETBSD_RELEASE_SETS
-Basename of the sets to unpack inside the sandbox, without their
-.Sq .tgz
-extension.
+Basename of the sets to unpack inside the sandbox, without their extension.
 .Pp
 If this variable is unset,
 .Xr sandboxctl 8
 will automatically determine the sets to extract based on the contents of the
 .Va NETBSD_RELEASE_RELEASEDIR
 directory.
-In particular, all available
-.Sq .tgz
-userland sets will be extracted.
+In particular, all available userland sets will be extracted.
 As for the kernel,
 .Sq kern-GENERIC
 will be preferred over any other kernel set but, if not present, the first
@@ -269,9 +265,9 @@ This function is typically used in
 There is no need to manually unmount the file systems in the
 .Fn pre_unmount_hook ;
 the unmount happens automatically.
-.It Nm sandbox_extract Ar tgz_file Ar dir Op Ar file1 .. fileN
-Extracts the given gzipped tarball in
-.Ar tgz_file
+.It Nm sandbox_extract Ar tar_file Ar dir Op Ar file1 .. fileN
+Extracts the compressed tarball given in
+.Ar tar_file
 into the
 .Ar dir
 directory.

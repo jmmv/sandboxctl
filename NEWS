@@ -28,6 +28,13 @@ Changes in version 1.1
   `darwin-native` sandbox starting with High Sierra.  Unfortunately, we
   now require SIP to be disabled for these tools to work.
 
+* Added support for XZ-compressed files to `sandbox_extract`.
+
+* Added support for XZ-compressed release sets to `netbsd-native` and
+  `netbsd-release`.  As a side-effect of this change, the
+  `NETBSD_RELEASE_SETS` setting in `netbsd-release` now takes a list
+  of set names *without* their extension.
+
 
 Changes in version 1.0
 ======================
