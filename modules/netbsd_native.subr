@@ -113,7 +113,8 @@ netbsd_native_create() {
 netbsd_native_mount() {
     local root="${1}"; shift
 
-    cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
+    cmp -s /etc/resolv.conf "${root}/etc/resolv.conf" \
+        || cp /etc/resolv.conf "${root}/etc"
 
     for dir in $(_netbsd_native_bindfs_mounts); do
         sandbox_bindfs "/${dir}" "${root}/${dir}"

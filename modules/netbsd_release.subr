@@ -144,5 +144,6 @@ netbsd_release_create() {
 netbsd_release_mount() {
     local root="${1}"; shift
 
-    cmp -s /etc/resolv.conf "${root}/etc" || cp /etc/resolv.conf "${root}/etc"
+    cmp -s /etc/resolv.conf "${root}/etc/resolv.conf" \
+        || cp /etc/resolv.conf "${root}/etc"
 }
